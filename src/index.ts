@@ -33,12 +33,12 @@ export const handler: Handler = async (
         body: JSON.stringify({ message: 'Forbidden' }, null, 2),
       };
     }
-    // const url = `https://${event.headers.Host}${path}?${queryStringParameters}`;
-
     return await Promise.race([
       routes(path, queryStringParameters),
       lambdaTimeout(context),
     ]).then(value => value);
+
+    // const url = `https://${event.headers.Host}${path}?${queryStringParameters}`;
   } catch (e) {
     return {
       statusCode: 500,

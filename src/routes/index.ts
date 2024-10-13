@@ -36,6 +36,10 @@ const routes = async (
         ...headers,
         Location: redirectUri,
       };
+
+      console.info('redirecting to app:', redirectUri);
+      console.info('redirecting to app:', searchParams);
+      console.info('redirecting to app:', headers);
       break;
 
     default:
