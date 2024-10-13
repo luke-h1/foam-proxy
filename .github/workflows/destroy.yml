@@ -40,6 +40,6 @@ jobs:
       - name: Destroy ${{ inputs.env }} environment
         uses: ./.github/actions/destroy
         with:
-          env: ${{ github.event.inputs.env }}
+          environment: ${{ github.event.inputs.env }}
           aws-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
