@@ -30,10 +30,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@lambda/*": ["./apps/lambda/src/*"],
-      "@lambda-test/*": ["./apps/lambda/src/test/*"]
+      "@lambda/*": ["./src/*"],
+      "@lambda-test/*": ["src/test/*"]
     },
     "incremental": true
   },
-  "exclude": ["node_modules"]
+  "include": ["src"],
+  "exclude": ["node_modules", "build"]
 }
