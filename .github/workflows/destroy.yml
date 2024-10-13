@@ -1,0 +1,45 @@
+name: Destroy
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: 'Environment to destroy'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - live
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PNPM_VERSION: 9.4.0
+  TF_VAR_env: live
+  TF_VAR_twitch_client_id: ${{ secrets.TWITCH_CLIENT_ID }}
+  TF_VAR_twitch_client_secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
+  TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
+  TF_VAR_root_domain: lhowsam.com
+  TF_VAR_private_key: ${{ secrets.STAGING_PRIVATE_KEY }}
+  TF_VAR_certificate_body: ${{ secrets.STAGING_CERTIFICATE_BODY }}
+  TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
+
+jobs:
+  destroy:
+    name: Destroy ${{ github.event.inputs.env }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Destroy ${{ inputs.env }} environment
+        uses: ./.github/actions/destroy
+        with:
+          env: ${{ github.event.inputs.env }}
+          aws-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
