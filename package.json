@@ -11,8 +11,8 @@
     "tsc": "tsc --noEmit",
     "alphabetize": "node scripts/alphabetizePackageJson.js",
     "commit": "cz",
-    "format": "prettier --write \"apps/**/*.{js,jsx,ts,tsx,css,scss,html}\"",
-    "format:check": "prettier --list-different \"apps/**/*.{js,jsx,ts,tsx,css,scss,html}\"",
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,scss,html}\"",
+    "format:check": "prettier --list-different \"src/**/*.{js,jsx,ts,tsx,css,scss,html}\"",
     "lint": "eslint --fix --ext .ts,.tsx,.js,.jsx .",
     "prepare": "husky"
   },
