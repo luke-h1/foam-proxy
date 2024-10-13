@@ -1,13 +1,11 @@
 import { APIGatewayProxyEvent, Context, Handler } from 'aws-lambda';
-import lambdaTimeout from './util/lambdaTimeout';
 import routes from './routes';
+import lambdaTimeout from './util/lambdaTimeout';
 
 export const handler: Handler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ) => {
-  // TODO: validate that all requests come from the app *only*
-
   const path =
     // path can either be the last part of the path or the routeKey
     // depending on whether the function is executed from aws or a http call comes thru from the http gateway
@@ -20,6 +18,20 @@ export const handler: Handler = async (
     event.rawPath;
 
   try {
+    // TODO: use API gateway authorizer instead of this hack
+    const apiKey = event.headers['x-api-key'];
+
+    if (apiKey !== process.env.API_KEY) {
+      return {
+        statusCode: 403,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({ message: 'Forbidden' }, null, 2),
+      };
+    }
+
     return await Promise.race([routes(path), lambdaTimeout(context)]).then(
       value => value,
     );
