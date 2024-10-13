@@ -7,7 +7,9 @@ const routes = async (
   path: string,
   queryParams: APIGatewayProxyEventQueryStringParameters | null,
 ) => {
-  let response: unknown = {};
+  let response: unknown = {
+    status: 'OK',
+  };
   let statusCode: number;
 
   let headers: Dictionary<string> = {
@@ -36,6 +38,7 @@ const routes = async (
         ...headers,
         Location: redirectUri,
       };
+      response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
 
       console.info('redirecting to app:', redirectUri);
       console.info('redirecting to app:', searchParams);
