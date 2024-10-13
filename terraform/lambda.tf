@@ -5,7 +5,7 @@ data "archive_file" "lambda_archive" {
 }
 
 resource "aws_iam_role" "lambda_exec" {
-  name = "lho-lambda-${var.env}-exec-role"
+  name = "foam-${var.env}-exec-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
