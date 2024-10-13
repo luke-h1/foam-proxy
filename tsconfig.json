@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "sourceMap": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowJs": true,
+    "alwaysStrict": true,
+    "allowSyntheticDefaultImports": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "strictNullChecks": true,
+    "experimentalDecorators": true,
+    "strictPropertyInitialization": false,
+    "lib": ["dom", "dom.iterable", "esnext", "webworker"],
+    "resolveJsonModule": true,
+    "outDir": "dist",
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "target": "es2020",
+    "strict": true,
+    "preserveConstEnums": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@lambda/*": ["./apps/lambda/src/*"],
+      "@lambda-test/*": ["./apps/lambda/src/test/*"]
+    },
+    "incremental": true
+  },
+  "exclude": ["node_modules"]
+}
