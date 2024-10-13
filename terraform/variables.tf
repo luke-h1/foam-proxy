@@ -11,6 +11,10 @@ variable "twitch_client_secret" {
   type = string
 }
 
+variable "api_key" {
+  type = string
+}
+
 variable "zone_id" {
   type        = string
   description = "The zone id for the route53 record"
