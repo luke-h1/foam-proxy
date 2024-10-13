@@ -17,6 +17,8 @@ export const handler: Handler = async (
     // @ts-expect-error missing aws-lambda types
     event.rawPath;
 
+  const { queryStringParameters } = event;
+
   try {
     // TODO: use API gateway authorizer instead of this hack
     const apiKey = event.headers['x-api-key'];
@@ -31,10 +33,12 @@ export const handler: Handler = async (
         body: JSON.stringify({ message: 'Forbidden' }, null, 2),
       };
     }
+    // const url = `https://${event.headers.Host}${path}?${queryStringParameters}`;
 
-    return await Promise.race([routes(path), lambdaTimeout(context)]).then(
-      value => value,
-    );
+    return await Promise.race([
+      routes(path, queryStringParameters),
+      lambdaTimeout(context),
+    ]).then(value => value);
   } catch (e) {
     return {
       statusCode: 500,
