@@ -1,0 +1,53 @@
+name: Destroy
+description: Destroy
+inputs:
+  environment:
+    description: 'The environment to destroy'
+    required: true
+  aws-key-id:
+    description: "The AWS key to use"
+    required: true
+  aws-secret-access-key:
+    description: "AWS secret access key to use"
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Validate environment
+      run: if [ "${{ inputs.environment }}" != "staging" ] && [ "${{ inputs.environment }}" != "live" ]; then echo "Invalid environment"; exit 1; fi
+      shell: bash
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ inputs.aws-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: eu-west-2
+        mask-aws-account-id: true
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Terraform init
+      working-directory: terraform
+      shell: bash
+      run: |
+        terraform init -backend-config="key=vpc/${{ inputs.environment }}.tfstate" -backend-config="bucket=foam-${{ inputs.environment }}-terraform-state" -input=false
+
+    - name: Terraform fmt -check
+      shell: bash
+      working-directory: terraform
+      run: terraform fmt -check
+
+    - name: Terraform validate
+      shell: bash
+      working-directory: terraform
+      run: terraform validate
+
+    - name: Terraform destroy
+      working-directory: terraform
+      shell: bash
+      run: terraform destroy -auto-approve

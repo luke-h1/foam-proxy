@@ -1,0 +1,16 @@
+name: Install
+description: Validate
+runs:
+  using: composite
+  steps:
+    - name: format:check
+      run: pnpm format:check
+      shell: bash
+
+    - name: lint
+      run: pnpm lint
+      shell: bash
+
+    - name: tsc
+      run: pnpm tsc
+      shell: bash
