@@ -38,6 +38,16 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
 
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Validate
+        uses: ./.github/actions/validate
+
+      - name: Build lambda
+        shell: bash
+        run: pnpm build
+
       - name: Destroy ${{ inputs.env }} environment
         uses: ./.github/actions/destroy
         with:
