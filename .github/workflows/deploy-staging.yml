@@ -40,6 +40,10 @@ jobs:
       - name: Validate
         uses: ./.github/actions/validate
 
+      - name: Build lambda
+        shell: bash
+        run: pnpm build
+
       - name: Deploy
         uses: ./.github/actions/deploy
         with:
