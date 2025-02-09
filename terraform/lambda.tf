@@ -49,10 +49,10 @@ resource "aws_lambda_function" "lambda" {
   architectures = ["arm64"]
   environment {
     variables = {
-      TWITCH_CLIENT_ID     = var.twitch_client_id
-      TWITCH_CLIENT_SECRET = var.twitch_client_secret
-      DEPLOYED_AT          = timestamp()
-      API_KEY              = var.api_key
+      # TWITCH_CLIENT_ID     = var.twitch_client_id
+      # TWITCH_CLIENT_SECRET = var.twitch_client_secret
+      DEPLOYED_AT = timestamp()
+      # API_KEY              = var.api_key
     }
   }
   tags = merge(var.tags, {
