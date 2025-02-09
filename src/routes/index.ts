@@ -24,7 +24,7 @@ const routes = async (
     //   statusCode = 200;
     //   break;
 
-    case '/api/pending':
+    case 'pending':
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
       response = `
@@ -40,7 +40,7 @@ const routes = async (
       `;
       break;
 
-    case '/api/proxy':
+    case 'proxy':
       statusCode = 302;
 
       const redirectUri =
