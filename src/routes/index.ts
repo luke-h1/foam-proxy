@@ -31,7 +31,9 @@ const routes = async (
         queryParams as Record<string, string>,
       ).toString();
 
-      const redirectUri = `foam://?${searchParams}`;
+      // const redirectUri = `foam://?${searchParams}`;
+
+      const redirectUri = `foam://?${new URL(requestUrl, 'http://foam/').searchParams}'`;
 
       headers = {
         ...headers,
