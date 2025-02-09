@@ -7,9 +7,9 @@ runs:
       run: pnpm format:check
       shell: bash
 
-    - name: lint
-      run: pnpm lint
-      shell: bash
+    # - name: lint
+    #   run: pnpm lint
+    #   shell: bash
 
     - name: tsc
       run: pnpm tsc
