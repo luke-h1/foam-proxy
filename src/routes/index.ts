@@ -24,7 +24,7 @@ const routes = async (
     //   statusCode = 200;
     //   break;
 
-    case 'pending':
+    case '/pending':
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
       response = `
@@ -40,7 +40,7 @@ const routes = async (
       `;
       break;
 
-    case 'proxy':
+    case '/proxy':
       statusCode = 302;
 
       const redirectUri =
@@ -56,12 +56,23 @@ const routes = async (
       break;
 
     default:
-      console.info('path', path);
-      response = JSON.stringify({ message: 'route not found' }, null, 2);
-      statusCode = 404;
+      // Match any root path and redirect to the app
+      if (path === '' || path === '/') {
+        statusCode = 302;
+        const redirectUri = 'foam://';
+        console.info('redirecting to app:', redirectUri);
+        headers = {
+          ...headers,
+          Location: redirectUri,
+        };
+        response = '';
+      } else {
+        console.info('path', path);
+        response = JSON.stringify({ message: 'route not found' }, null, 2);
+        statusCode = 404;
+      }
       break;
   }
-
   return {
     statusCode,
     headers,
