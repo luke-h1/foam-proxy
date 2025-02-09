@@ -6,12 +6,7 @@ export const handler: Handler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ) => {
-  const path =
-    event.requestContext?.path?.split('/').pop() ??
-    // @ts-expect-error missing aws-lambda types
-    event.routeKey ??
-    // @ts-expect-error missing aws-lambda types
-    event.rawPath;
+  const path = event.path;
 
   console.info('path is ->', path);
 
@@ -21,8 +16,7 @@ export const handler: Handler = async (
     queryStringParameters as unknown as string,
   ).toString();
 
-  // @ts-expect-error missing aws-lambda types
-  const url = `https://${event.headers.Host}${event.rawPath}?${queryString}`;
+  const url = `https://${event.headers.Host}${event.path}?${queryString}`;
 
   console.info('url ->', url);
 
