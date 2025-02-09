@@ -4,6 +4,7 @@ import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 const routes = async (
   path: string,
   queryParams: APIGatewayProxyEventQueryStringParameters | null,
+  requestUrl: string,
 ) => {
   let response: unknown = {
     status: 'OK',
@@ -37,6 +38,26 @@ const routes = async (
         Location: redirectUri,
       };
       response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
+      break;
+
+    case 'pending':
+    case '/api/pending':
+      statusCode = 200;
+      headers['Content-Type'] = 'text/html';
+
+      response = `<html>
+        <head>
+          <title>Redirecting...</title>
+        </head>
+        <body>
+          <h1>Redirecting...</h1>
+          <script>
+            setTimeout(() => {
+              window.location.href = 'foam://?${new URL(requestUrl, 'http://foam/').searchParams}';
+            }, 1000);
+          </script>
+        </body>
+        </html>`;
       break;
 
     default:
