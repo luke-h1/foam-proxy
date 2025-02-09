@@ -24,6 +24,21 @@ const routes = async (
     //   statusCode = 200;
     //   break;
 
+    case '/api/pending':
+      statusCode = 200;
+      headers['Content-Type'] = 'text/html';
+      response = `
+        <html>
+          <head>
+            <title>Pending</title>
+          </head>
+          <body>
+            <h1>Your request is pending</h1>
+            <p>Please wait while we process your request.</p>
+          </body>
+        </html>
+      `;
+      break;
     case '/api/proxy':
     case '/proxy':
       statusCode = 302;
