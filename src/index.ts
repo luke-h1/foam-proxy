@@ -17,6 +17,8 @@ export const handler: Handler = async (
     // @ts-expect-error missing aws-lambda types
     event.rawPath;
 
+  console.info('path is ->', path);
+
   const { queryStringParameters } = event;
 
   const queryString = new URLSearchParams(
