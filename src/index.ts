@@ -23,25 +23,25 @@ export const handler: Handler = async (
     queryStringParameters as unknown as string,
   ).toString();
 
-  // @ts-ignore
+  // @ts-expect-error missing aws-lambda types
   const url = `https://${event.headers.Host}${event.rawPath}?${queryString}`;
 
   console.info('url ->', url);
 
   try {
     // TODO: use API gateway authorizer instead of this hack
-    const apiKey = event.headers['x-api-key'];
+    // const apiKey = event.headers['x-api-key'];
 
-    if (apiKey !== process.env.API_KEY) {
-      return {
-        statusCode: 403,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-        body: JSON.stringify({ message: 'Forbidden' }, null, 2),
-      };
-    }
+    // if (apiKey !== process.env.API_KEY) {
+    //   return {
+    //     statusCode: 403,
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       'Access-Control-Allow-Origin': '*',
+    //     },
+    //     body: JSON.stringify({ message: 'Forbidden' }, null, 2),
+    //   };
+    // }
     return await Promise.race([
       routes(path, queryStringParameters, url),
       lambdaTimeout(context),

@@ -1,5 +1,4 @@
 /* eslint-disable no-case-declarations */
-import defaultTokenHandler from '@lambda/handlers/defaultTokenHandler';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
@@ -32,6 +31,8 @@ const routes = async (
       const redirectUri =
         `foam://?` + new URL(requestUrl, 'http://a').searchParams;
 
+      console.info('redirectUri', redirectUri);
+
       headers = {
         ...headers,
         Location: redirectUri,
@@ -40,6 +41,7 @@ const routes = async (
       break;
 
     default:
+      console.info('path', path);
       response = JSON.stringify({ message: 'route not found' }, null, 2);
       statusCode = 404;
       break;
