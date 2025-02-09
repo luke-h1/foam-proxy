@@ -27,9 +27,9 @@ const routes = async (
     case 'proxy':
     case '/api/proxy':
       statusCode = 302;
-      const searchParams = new URLSearchParams(
-        queryParams as Record<string, string>,
-      ).toString();
+      // const searchParams = new URLSearchParams(
+      //   queryParams as Record<string, string>,
+      // ).toString();
 
       // const redirectUri = `foam://?${searchParams}`;
 
