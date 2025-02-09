@@ -24,7 +24,7 @@ const routes = async (
     //   break;
 
     case 'proxy':
-    case '/api/auth/proxy':
+    case '/api/proxy':
       statusCode = 302;
       const searchParams = new URLSearchParams(
         queryParams as Record<string, string>,
