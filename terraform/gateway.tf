@@ -15,7 +15,7 @@ resource "aws_apigatewayv2_api" "lambda" {
 }
 
 resource "aws_apigatewayv2_domain_name" "domain_name" {
-  domain_name = var.env == "live" ? "foam.${var.root_domain}" : "foam-proxy-${var.env}.${var.root_domain}"
+  domain_name = var.env == "live" ? "foam.${var.root_domain}" : "foam-${var.env}.${var.root_domain}"
 
   domain_name_configuration {
     certificate_arn = aws_acm_certificate.cert.arn
