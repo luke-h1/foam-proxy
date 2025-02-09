@@ -18,13 +18,7 @@ const routes = async (
   };
 
   switch (path) {
-    // case 'default-token':
-    // case '/api/default-token':
-    //   response = await defaultTokenHandler();
-    //   statusCode = 200;
-    //   break;
-
-    case '/pending':
+    case '/api/pending':
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
       response = `
@@ -40,7 +34,7 @@ const routes = async (
       `;
       break;
 
-    case '/proxy':
+    case '/api/proxy':
       statusCode = 302;
 
       const redirectUri =
