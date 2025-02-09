@@ -18,6 +18,21 @@ const routes = async (
   };
 
   switch (path) {
+    case '/':
+      statusCode = 302;
+
+      const redirectUriStart =
+        `foam://?` + new URL(requestUrl, 'http://a').searchParams;
+
+      console.info('redirectUri', redirectUriStart);
+
+      headers = {
+        ...headers,
+        Location: redirectUriStart,
+      };
+      response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
+      break;
+
     // case 'default-token':
     // case '/api/default-token':
     //   response = await defaultTokenHandler();
