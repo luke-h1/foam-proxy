@@ -1,6 +1,4 @@
 /* eslint-disable no-case-declarations */
-import defaultTokenHandler from '@lambda/handlers/defaultTokenHandler';
-import { Dictionary } from '@lambda/types/util';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
@@ -12,26 +10,26 @@ const routes = async (
   };
   let statusCode: number;
 
-  let headers: Dictionary<string> = {
+  let headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,OPTIONS,POST,PUT,DELETE',
   };
 
   switch (path) {
-    case 'default-token':
-    case '/api/default-token':
-      response = await defaultTokenHandler();
-      statusCode = 200;
-      break;
+    // case 'default-token':
+    // case '/api/default-token':
+    //   response = await defaultTokenHandler();
+    //   statusCode = 200;
+    //   break;
 
     case 'proxy':
     case '/api/proxy':
       statusCode = 302;
-
       const searchParams = new URLSearchParams(
         queryParams as Record<string, string>,
       ).toString();
+
       const redirectUri = `foam://?${searchParams}`;
 
       headers = {
@@ -39,10 +37,6 @@ const routes = async (
         Location: redirectUri,
       };
       response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
-
-      console.info('redirecting to app:', redirectUri);
-      console.info('redirecting to app:', searchParams);
-      console.info('redirecting to app:', headers);
       break;
 
     default:

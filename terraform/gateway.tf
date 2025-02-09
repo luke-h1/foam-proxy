@@ -76,6 +76,7 @@ resource "aws_apigatewayv2_integration" "lambda" {
   integration_method = "POST"
 }
 
+
 # ROUTES 
 ##############################################################################
 resource "aws_apigatewayv2_route" "lambda_route_proxy" {
@@ -83,18 +84,19 @@ resource "aws_apigatewayv2_route" "lambda_route_proxy" {
   target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   route_key      = "GET /api/proxy"
   operation_name = "get proxy"
+  authorizer_id  = aws_apigatewayv2_authorizer.lambda_authorizer.id
 }
+
 resource "aws_apigatewayv2_route" "lambda_route_token" {
   api_id           = aws_apigatewayv2_api.lambda.id
   target           = "integrations/${aws_apigatewayv2_integration.lambda.id}"
   route_key        = "POST /api/default-token"
   api_key_required = false
   operation_name   = "post token"
+  authorizer_id    = aws_apigatewayv2_authorizer.lambda_authorizer.id
 }
 
-
 ##############################################################################
-
 
 resource "aws_cloudwatch_log_group" "api_gw" {
   name              = "/aws/api_gw/${aws_apigatewayv2_api.lambda.name}"
