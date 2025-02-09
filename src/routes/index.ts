@@ -4,7 +4,8 @@ import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
   path: string,
-  queryParams: APIGatewayProxyEventQueryStringParameters | null,
+  _queryParams: APIGatewayProxyEventQueryStringParameters | null,
+  requestUrl: string,
 ) => {
   let response: unknown = {
     status: 'OK',
@@ -18,30 +19,24 @@ const routes = async (
   };
 
   switch (path) {
-    case 'default-token':
-    case '/api/default-token':
-      response = await defaultTokenHandler();
-      statusCode = 200;
-      break;
+    // case 'default-token':
+    // case '/api/default-token':
+    //   response = await defaultTokenHandler();
+    //   statusCode = 200;
+    //   break;
 
-    case 'proxy':
     case '/api/proxy':
+    case '/proxy':
       statusCode = 302;
 
-      const searchParams = new URLSearchParams(
-        queryParams as Record<string, string>,
-      ).toString();
-      const redirectUri = `foam://?${searchParams}`;
+      const redirectUri =
+        `foam://?` + new URL(requestUrl, 'http://a').searchParams;
 
       headers = {
         ...headers,
         Location: redirectUri,
       };
       response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
-
-      console.info('redirecting to app:', redirectUri);
-      console.info('redirecting to app:', searchParams);
-      console.info('redirecting to app:', headers);
       break;
 
     default:
