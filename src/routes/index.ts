@@ -1,10 +1,10 @@
 /* eslint-disable no-case-declarations */
+import defaultTokenHandler from '@lambda/handlers/defaultTokenHandler';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
   path: string,
-  _queryParams: APIGatewayProxyEventQueryStringParameters | null,
-  requestUrl: string,
+  queryParams: APIGatewayProxyEventQueryStringParameters | null,
 ) => {
   let response: unknown = {
     status: 'OK',
@@ -18,48 +18,30 @@ const routes = async (
   };
 
   switch (path) {
-    // case 'default-token':
-    // case '/api/default-token':
-    //   response = await defaultTokenHandler();
-    //   statusCode = 200;
-    //   break;
+    case 'default-token':
+    case '/api/default-token':
+      response = await defaultTokenHandler();
+      statusCode = 200;
+      break;
 
     case 'proxy':
     case '/api/proxy':
       statusCode = 302;
-      // const searchParams = new URLSearchParams(
-      //   queryParams as Record<string, string>,
-      // ).toString();
 
-      // const redirectUri = `foam://?${searchParams}`;
-
-      const redirectUri = `foam://?${new URL(requestUrl, 'http://foam/').searchParams}'`;
+      const searchParams = new URLSearchParams(
+        queryParams as Record<string, string>,
+      ).toString();
+      const redirectUri = `foam://?${searchParams}`;
 
       headers = {
         ...headers,
         Location: redirectUri,
       };
       response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
-      break;
 
-    case 'pending':
-    case '/api/pending':
-      statusCode = 200;
-      headers['Content-Type'] = 'text/html';
-
-      response = `<html>
-        <head>
-          <title>Redirecting...</title>
-        </head>
-        <body>
-          <h1>Redirecting...</h1>
-          <script>
-            setTimeout(() => {
-              window.location.href = 'foam://?${new URL(requestUrl, 'http://foam/').searchParams}';
-            }, 1000);
-          </script>
-        </body>
-        </html>`;
+      console.info('redirecting to app:', redirectUri);
+      console.info('redirecting to app:', searchParams);
+      console.info('redirecting to app:', headers);
       break;
 
     default:

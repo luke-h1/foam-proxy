@@ -19,13 +19,6 @@ export const handler: Handler = async (
 
   const { queryStringParameters } = event;
 
-  const queryString = new URLSearchParams(
-    queryStringParameters as unknown as string,
-  ).toString();
-
-  // @ts-expect-error missing aws-lambda types
-  const url = `https://${event.headers.Host}${event.rawPath}?${queryString}`;
-
   try {
     // TODO: use API gateway authorizer instead of this hack
     const apiKey = event.headers['x-api-key'];
@@ -41,7 +34,7 @@ export const handler: Handler = async (
       };
     }
     return await Promise.race([
-      routes(path, queryStringParameters, url),
+      routes(path, queryStringParameters),
       lambdaTimeout(context),
     ]).then(value => value);
 
