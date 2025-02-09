@@ -3,7 +3,7 @@ import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
   path: string,
-  queryParams: APIGatewayProxyEventQueryStringParameters | null,
+  _queryParams: APIGatewayProxyEventQueryStringParameters | null,
   requestUrl: string,
 ) => {
   let response: unknown = {
