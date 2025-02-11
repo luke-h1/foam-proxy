@@ -20,7 +20,8 @@ const routes = async (
   };
 
   switch (path) {
-    case '/api/pending':
+    case 'pending':
+    case '/api/pending': {
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
       response = `
@@ -34,12 +35,12 @@ const routes = async (
           </body>
         </html>
       `;
-
       break;
+    }
 
-    case '/api/proxy':
+    case 'proxy':
+    case '/api/proxy': {
       statusCode = 302;
-
       const redirectUri = `foam://?${new URL(requestUrl, 'http://a').searchParams}`;
 
       // eslint-disable-next-line no-console
@@ -52,19 +53,13 @@ const routes = async (
       response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
 
       break;
+    }
 
-    case '/api/healthcheck':
+    case 'healthcheck':
+    case '/api/healthcheck': {
       statusCode = 200;
-
-      response = JSON.stringify(
-        {
-          message: 'OK',
-        },
-        null,
-        2,
-      );
-
       break;
+    }
 
     default:
       // Match any root path and redirect to the app
