@@ -62,21 +62,9 @@ const routes = async (
     }
 
     default:
-      // Match any root path and redirect to the app
-      if (path === '' || path === '/') {
-        statusCode = 302;
-        const redirectUri = 'foam://';
-        console.info('redirecting to app:', redirectUri);
-        headers = {
-          ...headers,
-          Location: redirectUri,
-        };
-        response = '';
-      } else {
-        console.info('path', path);
-        response = JSON.stringify({ message: 'route not found' }, null, 2);
-        statusCode = 404;
-      }
+      console.info('path', path);
+      response = JSON.stringify({ message: 'route not found' }, null, 2);
+      statusCode = 404;
       break;
   }
   return {
