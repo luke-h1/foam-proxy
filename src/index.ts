@@ -6,7 +6,7 @@ export const handler: Handler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ) => {
-  const path = event.path;
+  const { path } = event;
 
   console.info('path is ->', path);
 
