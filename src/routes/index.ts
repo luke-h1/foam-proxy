@@ -1,6 +1,9 @@
 /* eslint-disable no-console */
 /* eslint-disable no-shadow */
 /* eslint-disable no-case-declarations */
+import healthHandler from '@lambda/handlers/health';
+import pendingHandler from '@lambda/handlers/pending';
+import proxyHandler from '@lambda/handlers/proxy';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
@@ -24,17 +27,7 @@ const routes = async (
     case '/api/pending': {
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
-      response = `
-        <html>
-          <head>
-            <title>Pending</title>
-          </head>
-          <body>
-            <h1>Your request is pending</h1>
-            <p>Please wait while we process your request.</p>
-          </body>
-        </html>
-      `;
+      response = pendingHandler();
       break;
     }
 
@@ -50,7 +43,7 @@ const routes = async (
         ...headers,
         Location: redirectUri,
       };
-      response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
+      response = proxyHandler();
 
       break;
     }
@@ -58,6 +51,7 @@ const routes = async (
     case 'healthcheck':
     case '/api/healthcheck': {
       statusCode = 200;
+      response = healthHandler();
       break;
     }
 
