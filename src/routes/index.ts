@@ -18,7 +18,8 @@ const routes = async (
   };
 
   switch (path) {
-    case '/api/pending':
+    case '/api/pending': {
+
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
       response = `
@@ -32,9 +33,10 @@ const routes = async (
           </body>
         </html>
       `;
+    }
       break;
 
-    case '/api/proxy':
+    case '/api/proxy': {
       statusCode = 302;
 
       const redirectUri =
@@ -47,6 +49,18 @@ const routes = async (
         Location: redirectUri,
       };
       response = JSON.stringify({ message: 'redirecting to app' }, null, 2);
+    }
+
+      break;
+
+    case '/api/healthcheck': {
+      statusCode = 200;
+
+      response = JSON.stringify({
+        message: 'OK'
+      }, null, 2)
+    }
+
       break;
 
     default:
