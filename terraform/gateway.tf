@@ -84,6 +84,7 @@ resource "aws_apigatewayv2_route" "lambda_route_proxy" {
   route_key      = "GET /api/proxy"
   operation_name = "get proxy"
 }
+
 resource "aws_apigatewayv2_route" "lambda_route_token" {
   api_id           = aws_apigatewayv2_api.lambda.id
   target           = "integrations/${aws_apigatewayv2_integration.lambda.id}"
@@ -92,7 +93,26 @@ resource "aws_apigatewayv2_route" "lambda_route_token" {
   operation_name   = "post token"
 }
 
+resource "aws_apigatewayv2_route" "lambda_route_pending" {
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "GET /api/pending"
+  operation_name = "get pending"
+}
 
+resource "aws_apigatewayv2_route" "lambda_route_healthcheck" {
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "GET /api/healthcheck"
+  operation_name = "get healthcheck"
+}
+
+resource "aws_apigatewayv2_route" "lambda_route_head_healthcheck" {
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "HEAD /api/healthcheck"
+  operation_name = "head healthcheck"
+}
 ##############################################################################
 
 

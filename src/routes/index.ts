@@ -23,7 +23,6 @@ const routes = async (
   };
 
   switch (path) {
-    case 'pending':
     case '/api/pending': {
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
@@ -31,7 +30,6 @@ const routes = async (
       break;
     }
 
-    case 'proxy':
     case '/api/proxy': {
       statusCode = 302;
       const redirectUri = `foam://?${new URL(requestUrl, 'http://a').searchParams}`;
@@ -48,7 +46,6 @@ const routes = async (
       break;
     }
 
-    case 'healthcheck':
     case '/api/healthcheck': {
       statusCode = 200;
       response = healthHandler();
