@@ -52,6 +52,8 @@ resource "aws_lambda_function" "lambda" {
       # TWITCH_CLIENT_ID     = var.twitch_client_id
       # TWITCH_CLIENT_SECRET = var.twitch_client_secret
       DEPLOYED_AT = timestamp()
+      DEPLOYED_BY = var.deployed_by
+      GIT_SHA     = var.git_sha
       # API_KEY              = var.api_key
     }
   }

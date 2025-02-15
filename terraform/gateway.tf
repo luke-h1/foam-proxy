@@ -113,6 +113,13 @@ resource "aws_apigatewayv2_route" "lambda_route_head_healthcheck" {
   route_key      = "HEAD /api/healthcheck"
   operation_name = "head healthcheck"
 }
+
+resource "aws_apigatewayv2_route" "lambda_route_version" {
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "GET /api/version"
+  operation_name = "get version"
+}
 ##############################################################################
 
 
