@@ -1,4 +1,4 @@
-const versionHandler = async () => {
+const versionHandler = () => {
   return JSON.stringify(
     {
       version: '0.0.0-replace-me',
