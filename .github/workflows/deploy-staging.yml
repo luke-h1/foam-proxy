@@ -23,6 +23,9 @@ env:
   TF_VAR_private_key: ${{ secrets.STAGING_PRIVATE_KEY }}
   TF_VAR_certificate_body: ${{ secrets.STAGING_CERTIFICATE_BODY }}
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
+  TF_VAR_deployed_by: ${{ github.actor }}
+  TF_VAR_git_sha: ${{ github.sha }}
+
 jobs:
   release:
     name: Deploy staging
