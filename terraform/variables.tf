@@ -50,3 +50,11 @@ variable "tags" {
   }
 }
 
+variable "git_sha" {
+  type        = string
+  description = "the git sha that triggered the deployment"
+}
+variable "deployed_by" {
+  type        = string
+  description = "Who initiated the deployment?"
+}
