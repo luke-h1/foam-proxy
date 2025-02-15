@@ -52,6 +52,12 @@ const routes = async (
       break;
     }
 
+    case '/api/version': {
+      statusCode = 200;
+      response = versionHandler();
+      break;
+    }
+
     default:
       console.info('path', path);
       response = JSON.stringify({ message: 'route not found' }, null, 2);
