@@ -32,7 +32,7 @@ const routes = async (
 
     case '/api/proxy': {
       statusCode = 302;
-      const redirectUri = `foam://?${new URL(requestUrl, 'http://a').searchParams}`;
+      const redirectUri = `foam://?${new URL(requestUrl, '').searchParams}`;
 
       // eslint-disable-next-line no-console
       console.info('redirectUri', redirectUri);
