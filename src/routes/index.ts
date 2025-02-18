@@ -50,7 +50,6 @@ const routes = async (
     case '/api/token': {
       statusCode = 200;
       response = await tokenHandler();
-
       break;
     }
 
