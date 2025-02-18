@@ -3,13 +3,13 @@ variable "env" {
   description = "The environment to deploy to"
 }
 
-# variable "twitch_client_id" {
-#   type = string
-# }
+variable "twitch_client_id" {
+  type = string
+}
 
-# variable "twitch_client_secret" {
-#   type = string
-# }
+variable "twitch_client_secret" {
+  type = string
+}
 
 # variable "api_key" {
 #   type = string

@@ -4,6 +4,7 @@
 import healthHandler from '@lambda/handlers/health';
 import pendingHandler from '@lambda/handlers/pending';
 import proxyHandler from '@lambda/handlers/proxy';
+import tokenHandler from '@lambda/handlers/token';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
@@ -42,6 +43,13 @@ const routes = async (
         Location: redirectUri,
       };
       response = proxyHandler();
+
+      break;
+    }
+
+    case '/api/default-token': {
+      statusCode = 200;
+      response = await tokenHandler();
 
       break;
     }
