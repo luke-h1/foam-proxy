@@ -85,14 +85,6 @@ resource "aws_apigatewayv2_route" "lambda_route_proxy" {
   operation_name = "get proxy"
 }
 
-resource "aws_apigatewayv2_route" "lambda_route_token" {
-  api_id           = aws_apigatewayv2_api.lambda.id
-  target           = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  route_key        = "POST /api/default-token"
-  api_key_required = false
-  operation_name   = "post token"
-}
-
 resource "aws_apigatewayv2_route" "lambda_route_pending" {
   api_id         = aws_apigatewayv2_api.lambda.id
   target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
