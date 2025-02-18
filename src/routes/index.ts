@@ -47,7 +47,7 @@ const routes = async (
       break;
     }
 
-    case '/api/default-token': {
+    case '/api/token': {
       statusCode = 200;
       response = await tokenHandler();
 
