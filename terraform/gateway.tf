@@ -120,6 +120,13 @@ resource "aws_apigatewayv2_route" "lambda_route_version" {
   route_key      = "GET /api/version"
   operation_name = "get version"
 }
+
+resource "aws_apigatewayv2_route" "lambda_route_token" {
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "GET /api/token"
+  operation_name = "get token"
+}
 ##############################################################################
 
 
