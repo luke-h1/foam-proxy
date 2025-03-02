@@ -9,12 +9,14 @@ export default async function tokenHandler() {
     );
     return JSON.stringify({
       data,
+      error: null,
     });
   } catch (error) {
     console.error(`tokenHandler error: ${error}`);
   }
 
   return JSON.stringify({
-    message: 'FOAM_PROXY_API_FAIL',
+    data: null,
+    error: 'FOAM_PROXY_API_FAIL',
   });
 }

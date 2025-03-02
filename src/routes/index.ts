@@ -5,6 +5,7 @@ import healthHandler from '@lambda/handlers/health';
 import pendingHandler from '@lambda/handlers/pending';
 import proxyHandler from '@lambda/handlers/proxy';
 import tokenHandler from '@lambda/handlers/token';
+import versionHandler from '@lambda/handlers/version';
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
