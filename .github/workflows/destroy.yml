@@ -43,9 +43,9 @@ jobs:
       - name: Validate
         uses: ./.github/actions/validate
 
-      - name: Build lambda
+      - name: Build lambdas
         shell: bash
-        run: pnpm build
+        run: bun run build
 
       - name: Destroy ${{ inputs.env }} environment
         uses: ./.github/actions/destroy
