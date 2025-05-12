@@ -52,9 +52,9 @@ runs:
       working-directory: terraform
       run: terraform validate
 
-    - name: Build lambda
+    - name: Build lambdas
       shell: bash
-      run: pnpm build
+      run: bun run build
 
     - name: Terraform plan
       id: plan

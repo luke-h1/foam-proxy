@@ -3,6 +3,8 @@ const lambdaActions = {
   proxy: 'reqProxy',
   expoGo: 'reqProxyExpoGo',
   pending: 'reqPending',
+  unknown: 'unknown',
+  timeout: 'timeout',
 } as const;
 
 export type LambdaActions = keyof typeof lambdaActions;
@@ -11,7 +13,7 @@ interface Errors extends Error {
   statusCode?: number;
   code?: number;
   body?: string;
-  action?: LambdaActions | string;
+  action?: LambdaActions;
 }
 
 export default class LambdaError extends Error implements Errors {
@@ -21,7 +23,7 @@ export default class LambdaError extends Error implements Errors {
 
   body?: string;
 
-  action?: LambdaActions | string;
+  action?: LambdaActions;
 
   constructor({
     message,

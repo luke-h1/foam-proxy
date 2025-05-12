@@ -4,16 +4,14 @@ variable "env" {
 }
 
 variable "twitch_client_id" {
-  type = string
+  type        = string
+  description = "the twitch client id to use"
 }
 
 variable "twitch_client_secret" {
-  type = string
+  type        = string
+  description = "the twitch client secret to use"
 }
-
-# variable "api_key" {
-#   type = string
-# }
 
 variable "zone_id" {
   type        = string
@@ -23,7 +21,7 @@ variable "zone_id" {
 variable "root_domain" {
   type        = string
   description = "The root domain for the route53 record"
-  default     = "lhowsam.com"
+  default     = "foam-app.com"
 }
 
 variable "private_key" {
@@ -57,4 +55,17 @@ variable "git_sha" {
 variable "deployed_by" {
   type        = string
   description = "Who initiated the deployment?"
+}
+
+
+variable "project_name" {
+  type        = string
+  description = "name of the project"
+  default     = "foam-proxy"
+}
+
+variable "api_key" {
+  type        = string
+  description = "the API key to set on the authorizer"
+  default     = "change-me"
 }
