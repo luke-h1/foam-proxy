@@ -3,14 +3,14 @@ description: Validate
 runs:
   using: composite
   steps:
-    - name: format:check
-      run: pnpm format:check
+    - name: prettier
+      run: bun run prettier:check
       shell: bash
 
-    # - name: lint
-    #   run: pnpm lint
-    #   shell: bash
+    - name: lint
+      run: bun run lint:check
+      shell: bash
 
     - name: tsc
-      run: pnpm tsc
+      run: bun run ts:check
       shell: bash

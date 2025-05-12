@@ -1,5 +1,5 @@
 resource "aws_apigatewayv2_api" "lambda" {
-  name                         = "foam-gw-${var.env}"
+  name                         = "${var.project_name}-gw-${var.env}"
   protocol_type                = "HTTP"
   disable_execute_api_endpoint = true
   cors_configuration {
@@ -15,7 +15,7 @@ resource "aws_apigatewayv2_api" "lambda" {
 }
 
 resource "aws_apigatewayv2_domain_name" "domain_name" {
-  domain_name = var.env == "live" ? "foam.${var.root_domain}" : "foam-${var.env}.${var.root_domain}"
+  domain_name = var.env == "live" ? "auth.${var.root_domain}" : "auth-${var.env}.${var.root_domain}"
 
   domain_name_configuration {
     certificate_arn = aws_acm_certificate.cert.arn
@@ -114,10 +114,12 @@ resource "aws_apigatewayv2_route" "lambda_route_version" {
 }
 
 resource "aws_apigatewayv2_route" "lambda_route_token" {
-  api_id         = aws_apigatewayv2_api.lambda.id
-  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  route_key      = "GET /api/token"
-  operation_name = "get token"
+  api_id             = aws_apigatewayv2_api.lambda.id
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key          = "GET /api/token"
+  operation_name     = "get token"
+  authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
+  authorization_type = "CUSTOM"
 }
 ##############################################################################
 

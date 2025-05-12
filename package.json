@@ -1,44 +1,40 @@
 {
-  "name": "foam-proxy",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "build": "esbuild --bundle --minify --keep-names --sourcemap --sources-content=false --target=node20 --platform=node --outfile=dist/index.js src/index.ts",
-    "clean": "rm -rf ./dist",
-    "test": "jest",
-    "test:ci": "jest --ci --reporters=default --reporters=jest-junit",
-    "tsc": "tsc --noEmit",
-    "alphabetize": "node scripts/alphabetizePackageJson.js",
-    "commit": "cz",
-    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,scss,html}\"",
-    "format:check": "prettier --list-different \"src/**/*.{js,jsx,ts,tsx,css,scss,html}\"",
-    "lint": "eslint --fix --ext .ts,.tsx,.js,.jsx .",
-    "prepare": "husky"
+  "name": "root",
+  "version": "0.0.0-monorepo",
+  "private": true,
+  "engineStrict": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22",
+    "bun": "1.2.5"
   },
-  "dependencies": {
-    "aws-xray-sdk": "^3.6.0",
-    "axios": "^1.6.8",
-    "debug": "^4.3.4",
-    "lodash": "^4.17.21",
-    "node-cache": "^5.1.2"
+  "scripts": {
+    "alphabetize": "node scripts/alphabetizePackageJson.js",
+    "build": "bun run --filter '*' build",
+    "commit": "cz",
+    "fmt:tf": "terraform fmt terraform",
+    "lint:check": "bun run --filter '*' lint:check",
+    "lint:fix": "bun run --filter '*' lint:fix",
+    "preinstall": "only-allow bun && node ./scripts/commit-hooks",
+    "prepare": "husky",
+    "prettier:check": "bun run --filter '*' prettier:check",
+    "prettier:fix": "bun run --filter '*' prettier:fix",
+    "test": "bun run --filter '*' test",
+    "test:ci": "bun run --filter '*' test:ci",
+    "test:snapshot": "bun run --filter '*' test:snapshot",
+    "ts:check": "bun run --filter '*' ts:check"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.134",
-    "@types/debug": "^4.1.12",
-    "@types/jest": "^29.5.12",
-    "@types/lodash": "^4.17.0",
-    "babel-jest": "^29.7.0",
-    "esbuild": "^0.20.2",
-    "jest": "^29.7.0",
-    "jest-junit": "^16.0.0",
-    "ts-jest": "^29.2.4",
-    "typescript": "^5.4.3",
-    "@commitlint/cli": "^19.5.0",
-    "@commitlint/config-conventional": "^19.5.0",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/compat": "^1.2.8",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^8.57.1",
     "@types/node": "20.14.10",
-    "@typescript-eslint/eslint-plugin": "^8.8.1",
-    "@typescript-eslint/parser": "^8.8.1",
+    "@typescript-eslint/eslint-plugin": "^8.14.0",
+    "@typescript-eslint/parser": "^8.14.0",
     "commitizen": "4.3.1",
     "conventional-changelog-angular-all": "^1.7.0",
     "eslint": "^8.57.0",
@@ -46,10 +42,15 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-import-resolver-typescript": "^3.6.3",
     "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jest": "^28.11.0",
+    "eslint-plugin-prettier": "^5.2.6",
     "git-cz": "^4.9.0",
-    "husky": "^9.1.6",
-    "lint-staged": "15.2.10",
-    "prettier": "^3.3.3"
+    "husky": "^9.1.7",
+    "lint-staged": "15.3.0",
+    "only-allow": "^1.2.1",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript-eslint": "^8.32.0"
   },
   "config": {
     "commitizen": {
@@ -71,5 +72,8 @@
     "hooks": {
       "prepare-commit-msg": "exec < /dev/tty && npx cz --hook || true"
     }
+  },
+  "dependencies": {
+    "lerna": "^8.1.9"
   }
 }

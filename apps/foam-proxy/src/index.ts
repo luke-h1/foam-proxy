@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { APIGatewayProxyEvent, Context, Handler } from 'aws-lambda';
 import routes from './routes';
 import lambdaTimeout from './util/lambdaTimeout';
@@ -8,8 +9,6 @@ export const handler: Handler = async (
 ) => {
   const { path } = event;
 
-  console.info('path is ->', path);
-
   const { queryStringParameters } = event;
 
   const queryString = new URLSearchParams(
@@ -18,22 +17,9 @@ export const handler: Handler = async (
 
   const url = `https://${event.headers.Host}${event.path}?${queryString}`;
 
-  console.info('url ->', url);
+  console.info('origin url ->', url);
 
   try {
-    // TODO: use API gateway authorizer instead of this hack
-    // const apiKey = event.headers['x-api-key'];
-
-    // if (apiKey !== process.env.API_KEY) {
-    //   return {
-    //     statusCode: 403,
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'Access-Control-Allow-Origin': '*',
-    //     },
-    //     body: JSON.stringify({ message: 'Forbidden' }, null, 2),
-    //   };
-    // }
     return await Promise.race([
       routes(path, queryStringParameters, url),
       lambdaTimeout(context),

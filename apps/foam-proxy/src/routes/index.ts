@@ -34,6 +34,7 @@ const routes = async (
 
     case '/api/proxy': {
       statusCode = 302;
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       const redirectUri = `foam://?${new URL(requestUrl, 'http://a').searchParams}`;
 
       // eslint-disable-next-line no-console
@@ -67,7 +68,6 @@ const routes = async (
     }
 
     default:
-      console.info('path', path);
       response = JSON.stringify({ message: 'route not found' }, null, 2);
       statusCode = 404;
       break;

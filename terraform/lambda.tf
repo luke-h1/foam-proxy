@@ -34,7 +34,7 @@ resource "aws_iam_role_policy_attachment" "aws_xray_write_only_access" {
 }
 
 resource "aws_lambda_function" "lambda" {
-  function_name    = "foam-lambda-${var.env}"
+  function_name    = "${var.project_name}-lambda-${var.env}"
   runtime          = "nodejs20.x"
   handler          = "index.handler"
   role             = aws_iam_role.lambda_exec.arn
@@ -44,7 +44,7 @@ resource "aws_lambda_function" "lambda" {
   tracing_config {
     mode = "Active"
   }
-  description   = "foam proxy Lambda ${var.env}"
+  description   = "${var.project_name} Lambda ${var.env}"
   memory_size   = 128
   architectures = ["arm64"]
   environment {
