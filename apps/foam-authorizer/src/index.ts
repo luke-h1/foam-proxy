@@ -18,6 +18,9 @@ export const handler = (
     }
 
     if (apiKey !== process.env.API_KEY) {
+      console.error(
+        `Unauthorized attempt to access foam proxy with key: ${apiKey}`,
+      );
       return generatePolicy('user', 'Deny', event.methodArn);
     }
 
