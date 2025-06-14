@@ -12,6 +12,11 @@ export const handler = (
     // eslint-disable-next-line prefer-destructuring
     const apiKey = event.headers?.['x-api-key'];
 
+    if (!apiKey) {
+      console.error('Received no API key');
+      throw new Error('Blank API key');
+    }
+
     if (apiKey !== process.env.API_KEY) {
       return generatePolicy('user', 'Deny', event.methodArn);
     }
