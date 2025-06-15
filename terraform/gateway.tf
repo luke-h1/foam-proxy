@@ -128,12 +128,12 @@ resource "aws_apigatewayv2_route" "lambda_route_version" {
 }
 
 resource "aws_apigatewayv2_route" "lambda_route_token" {
-  api_id             = aws_apigatewayv2_api.lambda.id
-  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  route_key          = "GET /api/token"
-  operation_name     = "get token"
-  authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
-  authorization_type = "CUSTOM"
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "GET /api/token"
+  operation_name = "get token"
+  # authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
+  # authorization_type = "CUSTOM"
 }
 ##############################################################################
 
