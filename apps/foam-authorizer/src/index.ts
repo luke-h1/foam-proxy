@@ -10,7 +10,9 @@ export const handler = (
 ): APIGatewayAuthorizerResult => {
   try {
     // eslint-disable-next-line prefer-destructuring
-    const apiKey = event.headers?.['api-key'];
+    const apiKey =
+      event.headers?.['x-api-key'] ||
+      event.queryStringParameters?.['x-api-key'];
 
     if (!apiKey) {
       console.error('Received no API key');
