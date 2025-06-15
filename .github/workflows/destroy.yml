@@ -20,7 +20,7 @@ env:
   TF_VAR_twitch_client_secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
-  TF_VAR_api_key: ${{ secrets.STAGING_API_KEY }}
+  TF_VAR_api_key: ${{ secrets.API_KEY }}
   TF_VAR_private_key: ${{ secrets.STAGING_PRIVATE_KEY }}
   TF_VAR_certificate_body: ${{ secrets.STAGING_CERTIFICATE_BODY }}
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}

@@ -69,5 +69,5 @@ variable "project_name" {
 variable "api_key" {
   type        = string
   description = "the API key to set on the authorizer"
-  default     = "changeme"
+  sensitive   = true
 }
