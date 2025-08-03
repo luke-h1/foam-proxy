@@ -15,7 +15,7 @@ runs:
   steps:
     - name: Validate environment
       shell: bash
-      run: if [ "${{ inputs.environment }}" != "staging" ] && [ "${{ inputs.environment }}" != "live" ]; then echo "Invalid environment"; exit 1; fi
+      run: if [ "${{ inputs.environment }}" != "staging" ] && [ "${{ inputs.environment }}" != "production" ]; then echo "Invalid environment"; exit 1; fi
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
