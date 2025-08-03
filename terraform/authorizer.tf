@@ -15,6 +15,10 @@ resource "aws_lambda_function" "api_authorizer" {
   architectures    = ["arm64"]
   timeout          = 10
 
+  tracing_config {
+    mode = "Active"
+  }
+
   environment {
     variables = {
       API_KEY     = var.api_key
@@ -25,6 +29,18 @@ resource "aws_lambda_function" "api_authorizer" {
   tags = merge(var.tags, {
     ENVIRONMENT = var.env
   })
+}
+
+resource "aws_cloudwatch_log_group" "authorizer_logs" {
+  name              = "/aws/lambda/${aws_lambda_function.api_authorizer.function_name}"
+  retention_in_days = 1
+  log_group_class   = "STANDARD"
+
+  tags = {
+    Environment = var.env
+    Service     = "foam"
+    s3export    = "true"
+  }
 }
 
 resource "aws_apigatewayv2_authorizer" "api_key" {
