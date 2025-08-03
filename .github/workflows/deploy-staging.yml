@@ -1,9 +1,6 @@
 name: Deploy staging
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 concurrency:
   group: build-release-version
   cancel-in-progress: false
