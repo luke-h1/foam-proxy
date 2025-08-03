@@ -10,8 +10,8 @@ export const handler = async (
   // eslint-disable-next-line @typescript-eslint/require-await
 ): Promise<APIGatewayAuthorizerResult> => {
   try {
-    // eslint-disable-next-line prefer-destructuring
-    const apiKey = event.headers?.['x-api-key'];
+    const apiKey =
+      event.headers?.['x-api-key'] || event.queryStringParameters?.['api-key'];
 
     if (apiKey !== process.env.API_KEY) {
       console.info('deny');
