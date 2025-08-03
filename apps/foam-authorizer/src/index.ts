@@ -15,11 +15,16 @@ export const handler = async (
 
     if (apiKey !== process.env.API_KEY) {
       console.info('deny');
-      return generatePolicy('user', 'Deny', event.methodArn);
-    }
 
-    console.info('allow');
-    return generatePolicy('user', 'Allow', event.methodArn);
+      console.info(
+        `expected API key ${process.env.API_KEY} but received ${apiKey}`,
+      );
+
+      return generatePolicy('user', 'Deny', event.methodArn);
+    } else {
+      console.info('allow');
+      return generatePolicy('user', 'Allow', event.methodArn);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in authorizer:', error);
