@@ -15,7 +15,7 @@ resource "aws_apigatewayv2_api" "lambda" {
 }
 
 resource "aws_apigatewayv2_domain_name" "domain_name" {
-  domain_name = var.env == "live" ? "auth.${var.root_domain}" : "auth-${var.env}.${var.root_domain}"
+  domain_name = var.env == "production" ? "auth.${var.root_domain}" : "auth-${var.env}.${var.root_domain}"
 
   domain_name_configuration {
     certificate_arn = aws_acm_certificate.cert.arn
