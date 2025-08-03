@@ -13,9 +13,7 @@ const routes = async (
   _queryParams: APIGatewayProxyEventQueryStringParameters | null,
   requestUrl: string,
 ) => {
-  let response: unknown = {
-    status: 'OK',
-  };
+  let response: unknown;
   let statusCode: number;
 
   let headers: Record<string, string> = {

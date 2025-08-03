@@ -5,24 +5,20 @@ import {
   StatementEffect,
 } from 'aws-lambda';
 
-export const handler = (
+export const handler = async (
   event: APIGatewayRequestAuthorizerEvent,
-): APIGatewayAuthorizerResult => {
+  // eslint-disable-next-line @typescript-eslint/require-await
+): Promise<APIGatewayAuthorizerResult> => {
   try {
     // eslint-disable-next-line prefer-destructuring
-    const apiKey =
-      event.headers?.['x-api-key'] ||
-      event.queryStringParameters?.['x-api-key'];
-
-    if (!apiKey) {
-      console.error('Received no API key');
-      throw new Error('Blank API key');
-    }
+    const apiKey = event.headers?.['x-api-key'];
 
     if (apiKey !== process.env.API_KEY) {
+      console.info('deny');
       return generatePolicy('user', 'Deny', event.methodArn);
     }
 
+    console.info('allow');
     return generatePolicy('user', 'Allow', event.methodArn);
   } catch (error) {
     // eslint-disable-next-line no-console

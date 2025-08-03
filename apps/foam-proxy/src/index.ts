@@ -31,7 +31,9 @@ export const handler: Handler = async (
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
-      body: e,
+      body: {
+        error: e,
+      },
     };
   }
 };
