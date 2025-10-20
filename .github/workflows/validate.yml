@@ -19,6 +19,7 @@ env:
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
   TF_VAR_deployed_by: ${{ github.actor }}
   TF_VAR_git_sha: ${{ github.sha }}
+  TF_VAR_sentry_dsn: ${{ secrets.SENTRY_DSN }}
 
 jobs:
   validate:
