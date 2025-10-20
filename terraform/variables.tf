@@ -71,3 +71,14 @@ variable "api_key" {
   description = "the API key to set on the authorizer"
   sensitive   = true
 }
+
+variable "sentry_layer_arn" {
+  type        = string
+  description = "the arn of the sentry layer"
+  default     = "arn:aws:lambda:eu-west-2:943013980633:layer:SentryNodeServerlessSDKv10:28"
+}
+
+variable "sentry_dsn" {
+  type        = string
+  description = "the dsn of the sentry project"
+}
