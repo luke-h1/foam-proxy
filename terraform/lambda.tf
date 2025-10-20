@@ -64,7 +64,7 @@ resource "aws_lambda_function" "lambda" {
       SENTRY_DSN           = var.sentry_dsn
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
-      NODE_OPTIONS = "NODE_OPTIONS='--import @sentry/aws-serverless/awslambda-auto'"
+      NODE_OPTIONS         = "NODE_OPTIONS='--import @sentry/aws-serverless/awslambda-auto'"
     }
   }
   tags = merge(var.tags, {

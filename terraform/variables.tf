@@ -73,12 +73,12 @@ variable "api_key" {
 }
 
 variable "sentry_layer_arn" {
-  type = string 
+  type        = string
   description = "the arn of the sentry layer"
-  default = "arn:aws:lambda:eu-west-2:943013980633:layer:SentryNodeServerlessSDKv10:28"
+  default     = "arn:aws:lambda:eu-west-2:943013980633:layer:SentryNodeServerlessSDKv10:28"
 }
 
 variable "sentry_dsn" {
-  type = string 
+  type        = string
   description = "the dsn of the sentry project"
 }
