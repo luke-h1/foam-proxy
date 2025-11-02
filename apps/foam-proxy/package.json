@@ -29,6 +29,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@sentry/aws-serverless": "^10.22.0",
     "aws-xray-sdk": "^3.10.2",
     "axios": "^1.7.9",
     "debug": "^4.4.0",
