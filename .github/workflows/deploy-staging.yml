@@ -12,6 +12,7 @@ permissions:
   issues: write
   contents: write
   pull-requests: write
+  actions: read
 
 env:
   TF_VAR_env: staging
@@ -35,14 +36,22 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' || 
       (github.event_name == 'issue_comment' && 
-       github.event.issue.pull_request && 
+       github.event.issue.pull_request != null && 
        contains(github.event.comment.body, '!deploy-staging'))
     steps:
+      - name: Debug trigger info
+        if: github.event_name == 'issue_comment'
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Is PR: ${{ github.event.issue.pull_request != null }}"
+          echo "Comment body: ${{ github.event.comment.body }}"
+          echo "Contains trigger: ${{ contains(github.event.comment.body, '!deploy-staging') }}"
+          echo "PR number: ${{ github.event.issue.number }}"
+      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # For PR comments, checkout the PR branch instead of the default branch
           ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || github.ref }}
 
       - name: Install
