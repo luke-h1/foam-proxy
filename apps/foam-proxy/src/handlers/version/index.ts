@@ -1,4 +1,7 @@
+import * as Sentry from '@sentry/aws-serverless';
+
 const versionHandler = () => {
+  Sentry.captureMessage('versionHandler');
   return JSON.stringify(
     {
       deployedBy: process.env.DEPLOYED_BY ?? 'unknown',

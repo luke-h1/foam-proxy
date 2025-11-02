@@ -46,8 +46,6 @@ resource "aws_lambda_function" "lambda" {
   source_code_hash = data.archive_file.lambda_archive.output_base64sha256
   timeout          = 10
 
-  layers = [var.sentry_layer_arn]
-
   # tracing_config {
   #   mode = "Active"
   # }
