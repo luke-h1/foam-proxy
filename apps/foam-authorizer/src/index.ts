@@ -1,11 +1,12 @@
 /* eslint-disable prefer-destructuring, no-console */
+import * as newrelic from 'newrelic';
 import {
   APIGatewayRequestAuthorizerEvent,
   APIGatewayAuthorizerResult,
   StatementEffect,
 } from 'aws-lambda';
 
-export const handler = async (
+const lambdaHandler = async (
   event: APIGatewayRequestAuthorizerEvent,
   // eslint-disable-next-line @typescript-eslint/require-await
 ): Promise<APIGatewayAuthorizerResult> => {
@@ -51,3 +52,5 @@ const generatePolicy = (
     },
   };
 };
+
+export const handler = newrelic.setLambdaHandler(lambdaHandler);

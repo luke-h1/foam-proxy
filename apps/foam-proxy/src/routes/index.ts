@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 /* eslint-disable no-shadow */
 /* eslint-disable no-case-declarations */
+import * as newrelic from 'newrelic';
 import healthHandler from '@lambda/handlers/health';
 import pendingHandler from '@lambda/handlers/pending';
 import proxyHandler from '@lambda/handlers/proxy';
@@ -55,12 +56,18 @@ const routes = async (
 
     case '/api/healthcheck': {
       statusCode = 200;
+      console.info('Health check request received');
+      newrelic.incrementMetric('Custom/HealthCheck/Requests');
+      newrelic.addCustomAttribute('endpoint', 'healthcheck');
       response = healthHandler();
       break;
     }
 
     case '/api/version': {
       statusCode = 200;
+      console.info('Version request received');
+      newrelic.incrementMetric('Custom/Version/Requests');
+      newrelic.addCustomAttribute('endpoint', 'version');
       response = versionHandler();
       break;
     }

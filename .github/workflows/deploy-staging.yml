@@ -22,6 +22,7 @@ env:
   TF_VAR_deployed_by: ${{ github.actor }}
   TF_VAR_git_sha: ${{ github.sha }}
   TF_VAR_sentry_dsn: ${{ secrets.SENTRY_DSN }}
+  TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
 
 jobs:
   release:

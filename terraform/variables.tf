@@ -82,3 +82,15 @@ variable "sentry_dsn" {
   type        = string
   description = "the dsn of the sentry project"
 }
+
+variable "new_relic_license_key" {
+  type        = string
+  description = "the New Relic license key"
+  sensitive   = true
+}
+
+variable "new_relic_app_name" {
+  type        = string
+  description = "the New Relic application name"
+  default     = "foam-proxy"
+}

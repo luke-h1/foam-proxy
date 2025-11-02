@@ -28,5 +28,8 @@
     "jest-junit": "^16.0.0",
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "newrelic": "^12.11.0"
   }
 }

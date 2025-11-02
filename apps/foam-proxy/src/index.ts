@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
+import * as newrelic from 'newrelic';
 import { APIGatewayProxyEvent, Context, Handler } from 'aws-lambda';
 import routes from './routes';
 import lambdaTimeout from './util/lambdaTimeout';
 
-export const handler: Handler = async (
+const lambdaHandler: Handler = async (
   event: APIGatewayProxyEvent,
   context: Context,
 ) => {
@@ -37,3 +38,5 @@ export const handler: Handler = async (
     };
   }
 };
+
+export const handler = newrelic.setLambdaHandler(lambdaHandler);

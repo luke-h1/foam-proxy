@@ -21,8 +21,10 @@ resource "aws_lambda_function" "api_authorizer" {
 
   environment {
     variables = {
-      API_KEY     = var.api_key
-      ENVIRONMENT = var.env
+      API_KEY            = var.api_key
+      ENVIRONMENT        = var.env
+      NEW_RELIC_LICENSE_KEY = var.new_relic_license_key
+      NEW_RELIC_APP_NAME    = "${var.new_relic_app_name}-authorizer-${var.env}"
     }
   }
 

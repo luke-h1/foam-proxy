@@ -26,6 +26,7 @@ env:
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
   TF_VAR_deployed_by: luke-h1
   TF_VAR_sentry_dsn: ${{ secrets.SENTRY_DSN }}
+  TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
 
 jobs:
   destroy:

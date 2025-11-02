@@ -65,6 +65,8 @@ resource "aws_lambda_function" "lambda" {
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
       NODE_OPTIONS         = "NODE_OPTIONS='--import @sentry/aws-serverless/awslambda-auto'"
+      NEW_RELIC_LICENSE_KEY = var.new_relic_license_key
+      NEW_RELIC_APP_NAME    = "${var.new_relic_app_name}-${var.env}"
     }
   }
   tags = merge(var.tags, {
