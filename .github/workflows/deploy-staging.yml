@@ -1,9 +1,13 @@
 name: Deploy staging
 on:
   workflow_dispatch:
+  issue_comment:
+    types: [created]
+
 concurrency:
   group: build-release-version
   cancel-in-progress: false
+
 permissions:
   issues: write
   contents: write
@@ -28,12 +32,18 @@ jobs:
     name: Deploy staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      (github.event_name == 'issue_comment' && 
+       github.event.issue.pull_request && 
+       contains(github.event.comment.body, '!deploy-staging'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref }}
+          # For PR comments, checkout the PR branch instead of the default branch
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || github.head_ref }}
 
       - name: Install
         uses: ./.github/actions/install
