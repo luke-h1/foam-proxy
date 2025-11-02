@@ -1,6 +1,12 @@
 name: Deploy staging
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to checkout'
+        required: false
+        type: string
+        default: ''
 concurrency:
   group: build-release-version
   cancel-in-progress: false
@@ -33,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref }}
+          ref: ${{ inputs.branch != '' && inputs.branch || github.head_ref || github.ref }}
 
       - name: Install
         uses: ./.github/actions/install
