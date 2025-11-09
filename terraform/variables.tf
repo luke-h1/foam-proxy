@@ -78,7 +78,12 @@ variable "sentry_layer_arn" {
   default     = "arn:aws:lambda:eu-west-2:943013980633:layer:SentryNodeServerlessSDKv10:28"
 }
 
-variable "sentry_dsn" {
+variable "authorizer_dsn" {
   type        = string
-  description = "the dsn of the sentry project"
+  description = "the dsn of the authorizer sentry project"
+}
+
+variable "proxy_dsn" {
+  type        = string
+  description = "the dsn of the authorizer sentry project"
 }

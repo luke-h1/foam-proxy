@@ -24,7 +24,9 @@ env:
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
   TF_VAR_deployed_by: ${{ github.actor }}
   TF_VAR_git_sha: ${{ github.sha }}
-  TF_VAR_sentry_dsn: ${{ secrets.SENTRY_DSN }}
+  TF_VAR_sentry_dsn: "unused"
+  TF_VAR_authorizer_dsn: ${{ secrets.SENTRY_AUTHORIZER_DSN }}
+  TF_VAR_proxy_dsn: ${{ secrets.SENTRY_PROXY_DSN }}
 
 jobs:
   release:
