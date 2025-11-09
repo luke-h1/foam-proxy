@@ -2,7 +2,7 @@
   "name": "@foam-proxy/lambda",
   "version": "0.0.1",
   "scripts": {
-    "build": "esbuild --bundle --minify --keep-names --sourcemap --sources-content=false --target=node22 --platform=node --outfile=dist/index.js src/index.ts",
+    "build": "esbuild --bundle --minify --keep-names --sourcemap --sources-content=false --target=node22 --platform=node --external:newrelic --outfile=dist/index.js src/index.ts",
     "clean": "rm -rf ./dist",
     "lint:check": "eslint \"src/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
