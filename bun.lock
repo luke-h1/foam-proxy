@@ -36,6 +36,9 @@
     "apps/foam-authorizer": {
       "name": "@foam/authorizer",
       "version": "0.0.1",
+      "dependencies": {
+        "@sentry/serverless": "^7.120.4",
+      },
       "devDependencies": {
         "@types/aws-lambda": "^8.10.147",
         "@types/debug": "^4.1.12",
