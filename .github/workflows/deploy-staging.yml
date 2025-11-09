@@ -1,6 +1,8 @@
 name: Deploy staging
 on:
   workflow_dispatch:
+  pull_request:
+    types: [ opened, synchronize, edited, reopened ]
 concurrency:
   group: build-release-version
   cancel-in-progress: false
