@@ -57,7 +57,9 @@ export const handler = Sentry.AWSLambda.wrapHandler(
       // eslint-disable-next-line no-console
       console.error('Error in authorizer:', error);
       Sentry.captureException(error);
-      newrelic.noticeError(error);
+      newrelic.noticeError(
+        error instanceof Error ? error : new Error(String(error)),
+      );
 
       return generatePolicy('user', 'Deny', event.methodArn);
     }
