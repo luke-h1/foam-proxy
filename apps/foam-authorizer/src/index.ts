@@ -26,6 +26,17 @@ export const handler = Sentry.AWSLambda.wrapHandler(
       if (apiKey !== process.env.API_KEY) {
         console.info('deny');
 
+        Sentry.captureEvent({
+          message: 'deny',
+          level: 'info',
+          tags: {
+            route: 'authorizer',
+          },
+          extra: {
+            reqUrl: event.methodArn,
+          },
+        });
+
         console.info(
           `expected API key ${process.env.API_KEY} but received ${apiKey}`,
         );
@@ -39,6 +50,7 @@ export const handler = Sentry.AWSLambda.wrapHandler(
       // eslint-disable-next-line no-console
       console.error('Error in authorizer:', error);
       Sentry.captureException(error);
+
       return generatePolicy('user', 'Deny', event.methodArn);
     }
   },
