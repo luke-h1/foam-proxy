@@ -1,10 +1,9 @@
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
-      TWITCH_CLIENT_ID: string;
-      TWITCH_CLIENT_SECRET: string;
       API_KEY: string;
-      SENTRY_PROXY_DSN?: string;
+      ENVIRONMENT?: string;
+      SENTRY_AUTHORIZER_DSN?: string;
       SENTRY_ENVIRONMENT?: string;
       SENTRY_RELEASE?: string;
     }

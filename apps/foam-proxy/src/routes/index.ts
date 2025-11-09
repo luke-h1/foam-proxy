@@ -6,6 +6,8 @@ import pendingHandler from '@lambda/handlers/pending';
 import proxyHandler from '@lambda/handlers/proxy';
 import tokenHandler from '@lambda/handlers/token';
 import versionHandler from '@lambda/handlers/version';
+import * as Sentry from '@sentry/serverless';
+
 import { APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 
 const routes = async (
@@ -24,6 +26,16 @@ const routes = async (
 
   switch (path) {
     case '/api/pending': {
+      Sentry.captureEvent({
+        message: 'pending route',
+        level: 'info',
+        tags: {
+          route: 'pending',
+        },
+        extra: {
+          reqUrl: requestUrl,
+        },
+      });
       statusCode = 200;
       headers['Content-Type'] = 'text/html';
       response = pendingHandler();
@@ -42,6 +54,19 @@ const routes = async (
         ...headers,
         Location: redirectUri,
       };
+
+      Sentry.captureEvent({
+        message: 'proxy route',
+        level: 'info',
+        tags: {
+          route: 'proxy',
+        },
+        extra: {
+          reqUrl: requestUrl,
+          redirectUri,
+        },
+      });
+
       response = proxyHandler();
 
       break;
