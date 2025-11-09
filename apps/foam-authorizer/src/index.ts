@@ -1,4 +1,6 @@
 /* eslint-disable prefer-destructuring, no-console */
+import 'newrelic';
+import * as newrelic from 'newrelic';
 import {
   APIGatewayRequestAuthorizerEvent,
   APIGatewayAuthorizerResult,
@@ -37,6 +39,11 @@ export const handler = Sentry.AWSLambda.wrapHandler(
           },
         });
 
+        newrelic.recordCustomEvent('AuthorizerDeny', {
+          route: 'authorizer',
+          reqUrl: event.methodArn,
+        });
+
         console.info(
           `expected API key ${process.env.API_KEY} but received ${apiKey}`,
         );
@@ -50,6 +57,7 @@ export const handler = Sentry.AWSLambda.wrapHandler(
       // eslint-disable-next-line no-console
       console.error('Error in authorizer:', error);
       Sentry.captureException(error);
+      newrelic.noticeError(error);
 
       return generatePolicy('user', 'Deny', event.methodArn);
     }

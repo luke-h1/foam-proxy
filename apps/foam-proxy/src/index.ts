@@ -1,4 +1,6 @@
 /* eslint-disable no-console */
+import 'newrelic';
+import * as newrelic from 'newrelic';
 import { APIGatewayProxyEvent, Context, Handler } from 'aws-lambda';
 import * as Sentry from '@sentry/serverless';
 import routes from './routes';
@@ -32,6 +34,7 @@ export const handler: Handler = Sentry.AWSLambda.wrapHandler(
       ]).then(value => value);
     } catch (e) {
       Sentry.captureException(e);
+      newrelic.noticeError(e instanceof Error ? e : new Error(String(e)));
       return {
         statusCode: 500,
         headers: {

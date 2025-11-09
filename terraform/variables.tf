@@ -88,3 +88,27 @@ variable "proxy_dsn" {
   description = "the dsn of the authorizer sentry project"
   sensitive   = true
 }
+
+variable "new_relic_app_name" {
+  type        = string
+  description = "the name of the new relic app"
+  default     = "foam-proxy"
+}
+
+variable "new_relic_enabled" {
+  type        = string
+  description = "whether new relic is enabled"
+  default     = "true"
+}
+
+variable "new_relic_license_key" {
+  type        = string
+  description = "the license key for the new relic app"
+  sensitive   = true
+}
+
+variable "new_relic_log_level" {
+  type        = string
+  description = "the log level for the new relic app"
+  default     = "info"
+}
