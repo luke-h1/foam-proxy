@@ -59,7 +59,6 @@ variable "deployed_by" {
   default     = "luke-h1"
 }
 
-
 variable "project_name" {
   type        = string
   description = "name of the project"
@@ -81,9 +80,11 @@ variable "sentry_layer_arn" {
 variable "authorizer_dsn" {
   type        = string
   description = "the dsn of the authorizer sentry project"
+  sensitive   = true
 }
 
 variable "proxy_dsn" {
   type        = string
   description = "the dsn of the authorizer sentry project"
+  sensitive   = true
 }
