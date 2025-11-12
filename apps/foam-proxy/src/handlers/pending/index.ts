@@ -1,5 +1,13 @@
+import * as Sentry from '@sentry/serverless';
+
 const pendingHandler = () => {
-  return `<html>
+  return Sentry.startSpan(
+    {
+      name: 'pendingHandler',
+      op: 'function.pending',
+    },
+    () => {
+      return `<html>
           <head>
             <title>Foam - Pending</title>
           </head>
@@ -9,5 +17,7 @@ const pendingHandler = () => {
           </body>
         </html>
       `;
+    },
+  );
 };
 export default pendingHandler;

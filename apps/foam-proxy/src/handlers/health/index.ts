@@ -1,10 +1,20 @@
+import * as Sentry from '@sentry/serverless';
+
 const healthHandler = () => {
-  return JSON.stringify(
+  return Sentry.startSpan(
     {
-      status: 'OK',
+      name: 'healthHandler',
+      op: 'function.health',
     },
-    null,
-    2,
+    () => {
+      return JSON.stringify(
+        {
+          status: 'OK',
+        },
+        null,
+        2,
+      );
+    },
   );
 };
 export default healthHandler;
