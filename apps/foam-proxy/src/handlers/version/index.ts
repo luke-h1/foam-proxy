@@ -1,12 +1,22 @@
+import * as Sentry from '@sentry/serverless';
+
 const versionHandler = () => {
-  return JSON.stringify(
+  return Sentry.startSpan(
     {
-      deployedBy: process.env.DEPLOYED_BY ?? 'unknown',
-      deployedAt: process.env.DEPLOYED_AT ?? 'unknown',
-      gitSha: process.env.GIT_SHA ?? 'unknown',
+      name: 'versionHandler',
+      op: 'function.version',
     },
-    null,
-    2,
+    () => {
+      return JSON.stringify(
+        {
+          deployedBy: process.env.DEPLOYED_BY ?? 'unknown',
+          deployedAt: process.env.DEPLOYED_AT ?? 'unknown',
+          gitSha: process.env.GIT_SHA ?? 'unknown',
+        },
+        null,
+        2,
+      );
+    },
   );
 };
 export default versionHandler;
