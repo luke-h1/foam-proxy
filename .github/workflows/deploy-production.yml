@@ -14,9 +14,7 @@ permissions:
 
 env:
   TF_VAR_env: production
-  TF_VAR_twitch_client_id: ${{ secrets.TWITCH_CLIENT_ID }}
   TF_VAR_api_key: ${{ secrets.STAGING_API_KEY }}
-  TF_VAR_twitch_client_secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
   TF_VAR_private_key: ${{ secrets.PRODUCTION_PRIVATE_KEY }}
@@ -39,6 +37,17 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
+
+      - name: Load secrets
+        id: load_secrets
+        uses: 1password/load-secrets-action@v3
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_CLIENT_ID
+          TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_CLIENT_SECRET
+          OP_ENV_FILE: ".env"
 
       - name: Install
         uses: ./.github/actions/install
