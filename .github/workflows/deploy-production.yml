@@ -49,6 +49,11 @@ jobs:
           TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_CLIENT_SECRET
           OP_ENV_FILE: ".env"
 
+      - name: Set Terraform variables
+        run: |
+          echo "TF_VAR_twitch_client_id=$TWITCH_CLIENT_ID" >> $GITHUB_ENV
+          echo "TF_VAR_twitch_client_secret=$TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
+          
       - name: Install
         uses: ./.github/actions/install
 
