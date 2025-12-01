@@ -51,10 +51,25 @@ jobs:
         run: |
           echo "TF_VAR_twitch_client_id=${{ steps.load_secrets.outputs.TWITCH_CLIENT_ID }}" >> $GITHUB_ENV
           echo "TF_VAR_twitch_client_secret=${{ steps.load_secrets.outputs.TWITCH_CLIENT_SECRET }}" >> $GITHUB_ENV
-          echo "TF_VAR_private_key=${{ steps.load_secrets.outputs.STAGING_PRIVATE_KEY }}" >> $GITHUB_ENV
-          echo "TF_VAR_certificate_body=${{ steps.load_secrets.outputs.STAGING_CERTIFICATE_BODY }}" >> $GITHUB_ENV
-          echo "TF_VAR_certificate_chain=${{ steps.load_secrets.outputs.CERTIFICATE_CHAIN }}" >> $GITHUB_ENV
           echo "TF_VAR_api_key=${{ steps.load_secrets.outputs.STAGING_API_KEY }}" >> $GITHUB_ENV
+          
+          {
+            echo "TF_VAR_private_key<<EOF"
+            echo "${{ steps.load_secrets.outputs.STAGING_PRIVATE_KEY }}"
+            echo "EOF"
+          } >> $GITHUB_ENV
+          
+          {
+            echo "TF_VAR_certificate_body<<EOF"
+            echo "${{ steps.load_secrets.outputs.STAGING_CERTIFICATE_BODY }}"
+            echo "EOF"
+          } >> $GITHUB_ENV
+          
+          {
+            echo "TF_VAR_certificate_chain<<EOF"
+            echo "${{ steps.load_secrets.outputs.CERTIFICATE_CHAIN }}"
+            echo "EOF"
+          } >> $GITHUB_ENV
       - name: Install
         uses: ./.github/actions/install
 
