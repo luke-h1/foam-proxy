@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [Unreleased]
+## [0.1.0] - 2026-03-02
 
 ### Bug Fixes
 
@@ -204,6 +204,8 @@ All notable changes to this project will be documented in this file.
 - **(lambda)** Enhance sentry (#33)
 
 - **(lambda)** Update deps (#39)
+
+- Update changelog [skip ci]
 
 - Update changelog [skip ci]
 
