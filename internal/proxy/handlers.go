@@ -1,11 +1,13 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 
 	"github.com/foam/proxy/internal/config"
 	"github.com/foam/proxy/internal/proxy/services"
+	"github.com/getsentry/sentry-go"
 )
 
 type Handlers struct {
@@ -18,6 +20,9 @@ func NewHandlers(cfg *config.Proxy, twitch *services.TwitchService) *Handlers {
 }
 
 func (handlers *Handlers) Health() string {
+	meter := sentry.NewMeter(context.Background())
+	meter.Count("health.check", 1)
+
 	body, _ := json.Marshal(map[string]string{
 		"status": "OK",
 	})
