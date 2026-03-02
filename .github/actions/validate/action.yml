@@ -8,7 +8,7 @@ runs:
       shell: bash
 
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: v1.64.8
-        verify: "false"
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
+        $(go env GOPATH)/bin/golangci-lint run
+      shell: bash
