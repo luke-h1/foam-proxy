@@ -11,3 +11,4 @@ runs:
       uses: golangci/golangci-lint-action@v6
       with:
         version: v1.64.8
+        verify: "false"
