@@ -83,7 +83,7 @@ func buildRequestURL(req *events.APIGatewayProxyRequest) string {
 }
 
 func InitSentry() {
-	dsn := os.Getenv("SENTRY_DSN")
+	dsn := os.Getenv("PROXY_DSN")
 
 	if dsn == "" {
 		return

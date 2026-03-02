@@ -18,7 +18,7 @@ resource "aws_lambda_function" "api_authorizer" {
     variables = {
       API_KEY            = var.api_key
       ENVIRONMENT        = var.env
-      SENTRY_DSN         = var.authorizer_dsn
+      AUTH_DSN           = var.authorizer_dsn
       SENTRY_ENVIRONMENT = var.env
       SENTRY_RELEASE     = var.git_sha
     }
