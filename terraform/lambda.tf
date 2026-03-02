@@ -1,7 +1,7 @@
-data "archive_file" "lambda_archive" {
-  type        = "zip"
-  source_dir  = "${path.module}/../apps/foam-proxy/dist"
-  output_path = "${path.module}/../lambda.zip"
+locals {
+  go_dir         = "${path.module}/../go"
+  proxy_zip      = "${local.go_dir}/build/proxy.zip"
+  authorizer_zip = "${local.go_dir}/build/authorizer.zip"
 }
 
 resource "aws_iam_role" "lambda_exec" {
@@ -15,42 +15,24 @@ resource "aws_iam_role" "lambda_exec" {
       Principal = {
         Service = "lambda.amazonaws.com"
       }
-      }
-    ]
+    }]
   })
 }
-
 
 resource "aws_iam_role_policy_attachment" "lambda_policy" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# data "aws_iam_policy" "aws_xray_write_only_access" {
-#   arn = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
-# }
-# resource "aws_iam_role_policy_attachment" "aws_xray_write_only_access" {
-#   role       = aws_iam_role.lambda_exec.name
-#   policy_arn = data.aws_iam_policy.aws_xray_write_only_access.arn
-# }
-
-
-
-
 resource "aws_lambda_function" "lambda" {
   function_name    = "${var.project_name}-lambda-${var.env}"
-  runtime          = "nodejs22.x"
-  handler          = "index.handler"
+  runtime          = "provided.al2023"
+  handler          = "bootstrap"
   role             = aws_iam_role.lambda_exec.arn
-  filename         = "${path.module}/../lambda.zip"
-  source_code_hash = data.archive_file.lambda_archive.output_base64sha256
+  filename         = local.proxy_zip
+  source_code_hash = filebase64sha256(local.proxy_zip)
   timeout          = 10
 
-  layers = [var.sentry_layer_arn]
-
-  # tracing_config {
-  #   mode = "Active"
-  # }
   description   = "Foam proxy Lambda ${var.env}"
   memory_size   = 256
   architectures = ["arm64"]
@@ -64,11 +46,10 @@ resource "aws_lambda_function" "lambda" {
       SENTRY_DSN           = var.proxy_dsn
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
-      NODE_OPTIONS         = "NODE_OPTIONS='--import @sentry/aws-serverless/awslambda-auto'"
     }
   }
   tags = merge(var.tags, {
-    Environment = var.env,
+    Environment = var.env
   })
 }
 

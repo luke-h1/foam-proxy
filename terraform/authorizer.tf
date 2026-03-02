@@ -1,21 +1,14 @@
-data "archive_file" "auth_archive" {
-  type        = "zip"
-  source_dir  = "${path.module}/../apps/foam-authorizer/dist"
-  output_path = "${path.module}/../authorizer.zip"
-}
 
 resource "aws_lambda_function" "api_authorizer" {
-  filename         = "${path.module}/../authorizer.zip"
+  filename         = local.authorizer_zip
   function_name    = "${var.project_name}-api-authorizer-${var.env}"
   role             = aws_iam_role.lambda_exec.arn
-  handler          = "index.handler"
-  source_code_hash = data.archive_file.auth_archive.output_base64sha256
-  runtime          = "nodejs22.x"
+  handler          = "bootstrap"
+  source_code_hash = filebase64sha256(local.authorizer_zip)
+  runtime          = "provided.al2023"
   memory_size      = 256
   architectures    = ["arm64"]
   timeout          = 10
-
-  layers = [var.sentry_layer_arn]
 
   tracing_config {
     mode = "Active"
@@ -28,7 +21,6 @@ resource "aws_lambda_function" "api_authorizer" {
       SENTRY_DSN         = var.authorizer_dsn
       SENTRY_ENVIRONMENT = var.env
       SENTRY_RELEASE     = var.git_sha
-      NODE_OPTIONS       = "NODE_OPTIONS='--import @sentry/aws-serverless/awslambda-auto'"
     }
   }
 
@@ -38,7 +30,7 @@ resource "aws_lambda_function" "api_authorizer" {
 }
 
 resource "aws_cloudwatch_log_group" "auth_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.api_authorizer.function_name}-logs"
+  name              = "/aws/lambda/${aws_lambda_function.api_authorizer.function_name}"
   retention_in_days = 1
   log_group_class   = "STANDARD"
 

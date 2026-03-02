@@ -31,6 +31,9 @@ runs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
 
+    - name: Build lambdas
+      uses: ./.github/actions/build
+
     - name: Terraform init
       shell: bash
       working-directory: terraform
@@ -51,10 +54,6 @@ runs:
       shell: bash
       working-directory: terraform
       run: terraform validate
-
-    - name: Build lambdas
-      shell: bash
-      run: bun run build
 
     - name: Terraform plan
       id: plan
