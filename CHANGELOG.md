@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [Unreleased]
+
+### Miscellaneous
+
+- **(release)** V0.1.0 [skip ci]
+
+- **(lambda)** Health metrics
+
 ## [0.1.0] - 2026-03-02
 
 ### Bug Fixes
