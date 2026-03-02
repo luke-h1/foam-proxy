@@ -10,4 +10,4 @@ runs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        version: v2.0.0
+        version: v1.64.8
