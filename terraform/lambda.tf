@@ -1,7 +1,7 @@
 locals {
-  go_dir         = "${path.module}/../go"
-  proxy_zip      = "${local.go_dir}/build/proxy.zip"
-  authorizer_zip = "${local.go_dir}/build/authorizer.zip"
+  build_dir      = "${path.module}/.."
+  proxy_zip      = "${local.build_dir}/build/proxy.zip"
+  authorizer_zip = "${local.build_dir}/build/authorizer.zip"
 }
 
 resource "aws_iam_role" "lambda_exec" {
