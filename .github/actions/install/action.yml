@@ -18,7 +18,7 @@ runs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version-file: go-conv/go.mod
+        go-version-file: go.mod
 
     - name: Set up uv
       uses: astral-sh/setup-uv@v4
