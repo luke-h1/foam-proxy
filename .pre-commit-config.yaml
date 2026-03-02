@@ -1,0 +1,16 @@
+# Pre-commit hooks. Install: uv tool install pre-commit && uv tool install commitizen && pre-commit install && pre-commit install --hook-type commit-msg
+
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.0.0
+    hooks:
+      - id: golangci-lint
+      - id: golangci-lint-config-verify
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.13.9
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]

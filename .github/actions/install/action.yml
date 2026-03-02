@@ -1,49 +1,30 @@
 name: Install
-description: Install dependencies
+description: Install dependencies and setup
 runs:
   using: composite
   steps:
     - name: Install moreutils
-      run: sudo apt install moreutils
+      run: sudo apt install -y moreutils
       shell: bash
 
-    # https://github.com/actions/virtual-environments/issues/1187
-    - name: tune linux network
+    - name: Tune Linux network
       run: sudo ethtool -K eth0 tx off rx off
       shell: bash
 
     - name: Ensure branch is rebased with main
-      run: git pull --rebase
+      run: git pull --rebase origin main || true
       shell: bash
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
+    - name: Set up Go
+      uses: actions/setup-go@v5
       with:
-        node-version-file: .nvmrc
+        go-version-file: go-conv/go.mod
 
-    # https://github.com/actions/virtual-environments/issues/1187
-    - name: tune linux network
-      run: sudo ethtool -K eth0 tx off rx off
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Check commit message (conventional commits)
+      run: |
+        git log -1 --pretty=%B HEAD > /tmp/commit_msg
+        uvx commitizen check --commit-msg-file /tmp/commit_msg
       shell: bash
-
-    - name: Ensure branch is rebased with main
-      run: git pull --rebase
-      shell: bash
-
-    - name: 🥟 Setup Bun
-      uses: oven-sh/setup-bun@v2
-      with:
-        bun-version-file: '.bun-version'
-
-    - name: Setup Node
-      uses: actions/setup-node@v4.1.0
-      with:
-        node-version-file: .nvmrc
-
-    - name: Install dependencies
-      shell: bash
-      run: bun install
-
-    - name: Check commit message
-      shell: bash
-      run: bun commitlint --from=HEAD^1

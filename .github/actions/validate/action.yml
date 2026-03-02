@@ -1,16 +1,13 @@
-name: Install
-description: Validate
+name: Validate
+description: Validate Go code (build + lint)
 runs:
   using: composite
   steps:
-    - name: prettier
-      run: bun run prettier:check
+    - name: Go build
+      run: go build ./...
       shell: bash
 
-    - name: lint
-      run: bun run lint:check
-      shell: bash
-
-    - name: tsc
-      run: bun run ts:check
-      shell: bash
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest

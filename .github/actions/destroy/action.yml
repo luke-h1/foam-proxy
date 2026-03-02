@@ -17,6 +17,9 @@ runs:
       run: if [ "${{ inputs.environment }}" != "staging" ] && [ "${{ inputs.environment }}" != "live" ]; then echo "Invalid environment"; exit 1; fi
       shell: bash
 
+    - name: Build Go lambdas
+      uses: ./.github/actions/build
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
 

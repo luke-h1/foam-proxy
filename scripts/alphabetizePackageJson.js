@@ -5,8 +5,6 @@ const path = require('path');
 
 const packageJsonPaths = [
   'package.json',
-  'apps/foam-proxy/package.json',
-  'apps/foam-authorizer/package.json',
 ];
 
 packageJsonPaths.forEach(packageJsonPath => {

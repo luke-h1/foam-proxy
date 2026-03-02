@@ -1,0 +1,81 @@
+name: Changelog
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    name: Generate changelog
+    runs-on: ubuntu-latest
+    outputs:
+      content: ${{ steps.git-cliff.outputs.content }}
+      version: ${{ steps.git-cliff.outputs.version }}
+      bumped_version: ${{ steps.bumped.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        run: |
+          ARCH=$(uname -m)
+          [ "$ARCH" = "x86_64" ] && ARCH=x86_64 || true
+          [ "$ARCH" = "aarch64" ] && ARCH=aarch64 || true
+          TAG=$(curl -sSf https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r .tag_name)
+          URL="https://github.com/orhun/git-cliff/releases/download/${TAG}/git-cliff-${TAG#v}-${ARCH}-unknown-linux-gnu.tar.gz"
+          curl -sSfL "$URL" | tar xz
+          mv git-cliff-*/git-cliff ./git-cliff
+          chmod +x ./git-cliff
+          echo "$PWD" >> $GITHUB_PATH
+          echo "GIT_CLIFF_BIN=$PWD/git-cliff" >> $GITHUB_ENV
+
+      - name: Bumped version
+        id: bumped
+        run: |
+          v=$(./git-cliff --bumped-version 2>/dev/null || echo "0.1.0")
+          echo "version=$v" >> $GITHUB_OUTPUT
+          echo "Next version: $v"
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+  commit-changelog:
+    name: Commit CHANGELOG
+    needs: changelog
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Commit and push
+        run: |
+          git config user.name '${{ github.actor }}'
+          git config user.email '${{ github.actor }}@users.noreply.github.com'
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "chore: update changelog [skip ci]"
+          git push

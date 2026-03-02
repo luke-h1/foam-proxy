@@ -38,7 +38,3 @@ jobs:
 
       - name: Validate
         uses: ./.github/actions/validate
-
-      - name: Build lambdas
-        shell: bash
-        run: bun run build
