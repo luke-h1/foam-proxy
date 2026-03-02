@@ -26,5 +26,5 @@ runs:
     - name: Check commit message (conventional commits)
       run: |
         git log -1 --pretty=%B HEAD > /tmp/commit_msg
-        uvx commitizen check --commit-msg-file /tmp/commit_msg
+        uvx --from commitizen cz check --commit-msg-file /tmp/commit_msg
       shell: bash
