@@ -11,10 +11,6 @@ runs:
       run: sudo ethtool -K eth0 tx off rx off
       shell: bash
 
-    - name: Ensure branch is rebased with main
-      run: git pull --rebase origin main || true
-      shell: bash
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:

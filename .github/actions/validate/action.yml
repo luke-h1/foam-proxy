@@ -11,5 +11,3 @@ runs:
       uses: golangci/golangci-lint-action@v9
       with:
         version: v2.10
-        verify: false
-        skip-cache: true
