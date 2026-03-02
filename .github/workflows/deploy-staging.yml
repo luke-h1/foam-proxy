@@ -44,7 +44,7 @@ jobs:
           TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_CLIENT_ID
           TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_CLIENT_SECRET
           PROXY_DSN: op://ci-cd/foam-staging/SENTRY_PROXY_DSN
-          AUTHORIZER_DSN: op://ci-cd/foam-staging/SENTRY_AUTHORIZER_DSN
+          AUTHORIZER_DSN: op://ci-cd/foam-staging/SENTRY_AUTH_DSN
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables
