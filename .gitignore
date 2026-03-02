@@ -64,4 +64,4 @@ terraform.rc
 
 node_modules
 .idea
-build
+/build

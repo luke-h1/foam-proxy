@@ -1,7 +1,7 @@
 locals {
-  go_dir         = "${path.module}/../go"
-  proxy_zip      = "${local.go_dir}/build/proxy.zip"
-  authorizer_zip = "${local.go_dir}/build/authorizer.zip"
+  build_dir      = "${path.module}/.."
+  proxy_zip      = "${local.build_dir}/build/proxy.zip"
+  authorizer_zip = "${local.build_dir}/build/authorizer.zip"
 }
 
 resource "aws_iam_role" "lambda_exec" {
@@ -43,7 +43,7 @@ resource "aws_lambda_function" "lambda" {
       GIT_SHA              = var.git_sha
       TWITCH_CLIENT_ID     = var.twitch_client_id
       TWITCH_CLIENT_SECRET = var.twitch_client_secret
-      SENTRY_DSN           = var.proxy_dsn
+      PROXY_DSN            = var.proxy_dsn
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
     }

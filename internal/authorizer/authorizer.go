@@ -131,7 +131,7 @@ func constantTimeEquals(a, b string) bool {
 }
 
 func InitSentry() {
-	dsn := os.Getenv("SENTRY_DSN")
+	dsn := os.Getenv("AUTH_DSN")
 	if dsn == "" {
 		return
 	}

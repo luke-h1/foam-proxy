@@ -11,14 +11,10 @@ runs:
       run: sudo ethtool -K eth0 tx off rx off
       shell: bash
 
-    - name: Ensure branch is rebased with main
-      run: git pull --rebase origin main || true
-      shell: bash
-
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version-file: go-conv/go.mod
+        go-version-file: go.mod
 
     - name: Set up uv
       uses: astral-sh/setup-uv@v4
@@ -26,5 +22,5 @@ runs:
     - name: Check commit message (conventional commits)
       run: |
         git log -1 --pretty=%B HEAD > /tmp/commit_msg
-        uvx commitizen check --commit-msg-file /tmp/commit_msg
+        uvx --from commitizen cz check --commit-msg-file /tmp/commit_msg
       shell: bash

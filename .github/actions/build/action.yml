@@ -1,0 +1,8 @@
+name: Build Lambdas
+description: Build proxy and authorizer Lambda
+runs:
+  using: composite
+  steps:
+    - name: Build Lambda zips
+      run: make zips
+      shell: bash
