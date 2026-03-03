@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [Unreleased]
+
+### Bug Fixes
+
+- **(infrastructure)** Strip v
+
+
+### Miscellaneous
+
+- **(release)** Vvv0.2.1 [skip ci]
+
 ## [0.2.1] - 2026-03-03
 
 ### Bug Fixes
