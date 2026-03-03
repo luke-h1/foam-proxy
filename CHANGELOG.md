@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [Unreleased]
+
+### Features
+
+- **(proxy)** Move refresh token to lambda (#43)
+
+
+### Miscellaneous
+
+- **(release)** Vv0.1.1 [skip ci]
+
 ## [0.1.1] - 2026-03-02
 
 ### Miscellaneous
