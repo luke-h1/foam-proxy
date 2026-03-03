@@ -135,6 +135,15 @@ resource "aws_apigatewayv2_route" "lambda_route_token" {
   authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
   authorization_type = "CUSTOM"
 }
+
+resource "aws_apigatewayv2_route" "lambda_route_refresh_token" {
+  api_id             = aws_apigatewayv2_api.lambda.id
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key          = "POST /api/refresh-token"
+  operation_name     = "post refresh token"
+  authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
+  authorization_type = "CUSTOM"
+}
 ##############################################################################
 
 

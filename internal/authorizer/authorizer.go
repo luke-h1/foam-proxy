@@ -139,7 +139,12 @@ func InitSentry() {
 		Dsn:              dsn,
 		Environment:      os.Getenv("SENTRY_ENVIRONMENT"),
 		Release:          os.Getenv("SENTRY_RELEASE"),
+		AttachStacktrace: true,
+		SampleRate:       1.0,
+		EnableTracing:    true,
 		TracesSampleRate: 0.5,
+		MaxBreadcrumbs:   50,
+		SendDefaultPII:   false,
 	})
 	if err != nil {
 		log.Printf("sentry init: %v", err)
