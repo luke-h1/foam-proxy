@@ -60,6 +60,28 @@ func (handlers *Handlers) Token() string {
 	return string(body)
 }
 
+func (handlers *Handlers) RefreshToken(token string) string {
+	if token == "" {
+		body, _ := json.Marshal(map[string]interface{}{
+			"data":  nil,
+			"error": "token query param is required",
+		})
+		return string(body)
+	}
+
+	data, err := handlers.twitch.RefreshToken(token)
+	if err != nil {
+		body, _ := json.Marshal(map[string]interface{}{
+			"data":  nil,
+			"error": err.Error(),
+		})
+		return string(body)
+	}
+
+	body, _ := json.Marshal(map[string]interface{}{"data": data, "error": nil})
+	return string(body)
+}
+
 func (handlers *Handlers) Version() string {
 	out := map[string]string{
 		"deployedBy": "unknown",

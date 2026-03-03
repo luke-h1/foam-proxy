@@ -2,7 +2,7 @@ package proxy
 
 import "encoding/json"
 
-func (handlers *Handlers) Route(path, requestURL string) (statusCode int, headers map[string]string, body string) {
+func (handlers *Handlers) Route(path, requestURL string, query map[string]string) (statusCode int, headers map[string]string, body string) {
 	headers = DefaultHeaders()
 
 	switch path {
@@ -21,6 +21,17 @@ func (handlers *Handlers) Route(path, requestURL string) (statusCode int, header
 
 	case "/api/token":
 		return 200, headers, handlers.Token()
+
+	case "/api/refresh-token":
+		refreshToken := ""
+		if query != nil {
+			refreshToken = query["token"]
+		}
+		respBody := handlers.RefreshToken(refreshToken)
+		if refreshToken == "" {
+			return 400, headers, respBody
+		}
+		return 200, headers, respBody
 
 	case "/api/healthcheck":
 		return 200, headers, handlers.Health()

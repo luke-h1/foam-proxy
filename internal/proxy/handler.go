@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
@@ -31,14 +32,30 @@ func NewHandler() (*Handler, error) {
 }
 
 func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
+	defer sentry.Flush(2 * time.Second)
+
 	if input == nil {
 		return apiResponse(500, DefaultHeaders(), map[string]string{"error": "invalid request"}), nil
 	}
 
 	requestID := input.RequestContext.RequestID
 	requestURL := buildRequestURL(input)
+	method := input.RequestContext.HTTPMethod
+	if method == "" {
+		method = "GET"
+	}
+	tx := sentry.StartTransaction(ctx, method+" "+input.Path,
+		sentry.WithOpName("http.server"),
+		sentry.WithTransactionSource(sentry.SourceRoute),
+	)
+	defer tx.Finish()
+
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetTag("request_id", requestID)
+		scope.SetTag("path", input.Path)
+	})
 	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q}`, requestID, input.Path, requestURL)
-	status, headers, body := handler.handlers.Route(input.Path, requestURL)
+	status, headers, body := handler.handlers.Route(input.Path, requestURL, input.QueryStringParameters)
 	return &events.APIGatewayProxyResponse{
 		StatusCode: status,
 		Headers:    headers,
@@ -84,16 +101,20 @@ func buildRequestURL(req *events.APIGatewayProxyRequest) string {
 
 func InitSentry() {
 	dsn := os.Getenv("PROXY_DSN")
-
 	if dsn == "" {
 		return
 	}
-
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              dsn,
-		Environment:      os.Getenv("SENTRY_ENVIRONMENT"),
-		Release:          os.Getenv("SENTRY_RELEASE"),
-		TracesSampleRate: 0.5,
+		Dsn:                dsn,
+		Environment:        os.Getenv("SENTRY_ENVIRONMENT"),
+		Release:            os.Getenv("SENTRY_RELEASE"),
+		AttachStacktrace:   true,
+		SampleRate:         1.0,
+		EnableTracing:      true,
+		TracesSampleRate:   0.5,
+		MaxBreadcrumbs:     50,
+		SendDefaultPII:     false,
+		Debug:              false,
 	})
 	if err != nil {
 		log.Printf("sentry init: %v", err)
