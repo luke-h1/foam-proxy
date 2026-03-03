@@ -38,7 +38,7 @@ jobs:
         id: bumped
         run: |
           v=$(./git-cliff --bumped-version 2>/dev/null || echo "0.1.0")
-          v=${v#v}
+          v=$(echo "$v" | sed 's/^v*//')
           echo "version=$v" >> $GITHUB_OUTPUT
           echo "Next version: $v"
 

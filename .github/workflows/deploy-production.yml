@@ -97,7 +97,7 @@ jobs:
         id: bump
         run: |
           v=$(./git-cliff --bumped-version 2>/dev/null || echo "0.1.0")
-          v=${v#v}
+          v=$(echo "$v" | sed 's/^v*//')
           echo "version=$v" >> $GITHUB_OUTPUT
           echo "Release version: $v"
 
@@ -106,16 +106,16 @@ jobs:
           git config user.name '${{ github.actor }}'
           git config user.email '${{ github.actor }}@users.noreply.github.com'
           VERSION="${{ steps.bump.outputs.version }}"
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "Tag v${VERSION} already exists, skipping"
+          if git rev-parse "${VERSION}" >/dev/null 2>&1; then
+            echo "Tag ${VERSION} already exists, skipping"
           else
-            git tag -a "v${VERSION}" -m "Release v${VERSION}"
-            git push origin "v${VERSION}"
+            git tag -a "${VERSION}" -m "Release ${VERSION}"
+            git push origin "${VERSION}"
           fi
 
       - name: Update CHANGELOG for release
         run: |
           ./git-cliff -o CHANGELOG.md
           git add CHANGELOG.md
-          git diff --staged --quiet || git commit -m "chore(release): v${{ steps.bump.outputs.version }} [skip ci]"
+          git diff --staged --quiet || git commit -m "chore(release): ${{ steps.bump.outputs.version }} [skip ci]"
           git push origin main
