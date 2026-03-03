@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [Unreleased]
+## [0.2.0] - 2026-03-03
 
 ### Features
 
@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous
 
 - **(release)** Vv0.1.1 [skip ci]
+
+- Update changelog [skip ci]
 
 ## [0.1.1] - 2026-03-02
 
