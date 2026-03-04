@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/getsentry/sentry-go"
 )
 
 const (
@@ -35,4 +37,19 @@ func LoadEnv() (*Proxy, error) {
 		DeployedAt:         os.Getenv("DEPLOYED_AT"),
 		GitSHA:             os.Getenv("GIT_SHA"),
 	}, nil
+}
+
+func SentryOptions(dsn string) sentry.ClientOptions {
+	return sentry.ClientOptions{
+		Dsn:              dsn,
+		Environment:      os.Getenv("SENTRY_ENVIRONMENT"),
+		Release:          os.Getenv("SENTRY_RELEASE"),
+		AttachStacktrace: true,
+		SampleRate:       1.0,
+		EnableTracing:    true,
+		TracesSampleRate: 0.5,
+		MaxBreadcrumbs:   50,
+		SendDefaultPII:   false,
+		Debug:            false,
+	}
 }
