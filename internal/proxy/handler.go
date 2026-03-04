@@ -104,19 +104,7 @@ func InitSentry() {
 	if dsn == "" {
 		return
 	}
-	err := sentry.Init(sentry.ClientOptions{
-		Dsn:                dsn,
-		Environment:        os.Getenv("SENTRY_ENVIRONMENT"),
-		Release:            os.Getenv("SENTRY_RELEASE"),
-		AttachStacktrace:   true,
-		SampleRate:         1.0,
-		EnableTracing:      true,
-		TracesSampleRate:   0.5,
-		MaxBreadcrumbs:     50,
-		SendDefaultPII:     false,
-		Debug:              false,
-	})
-	if err != nil {
+	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
 		log.Printf("sentry init: %v", err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/foam/proxy/internal/config"
 	"github.com/getsentry/sentry-go"
 	"github.com/getsentry/sentry-go/attribute"
 )
@@ -41,12 +42,17 @@ func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events
 		methodArn = "*"
 	}
 
-	deny := func() (events.APIGatewayCustomAuthorizerResponse, error) {
+	deny := func(reason string) (events.APIGatewayCustomAuthorizerResponse, error) {
+		if reason != "" {
+			sentry.NewMeter(ctx).Count("authorizer.deny", 1,
+				sentry.WithAttributes(attribute.String("reason", reason)),
+			)
+		}
 		return generatePolicy("user", "Deny", methodArn), nil
 	}
 
 	if h.expectedAPIKey == "" {
-		return deny()
+		return deny("api_key_not_configured")
 	}
 
 	headers := normalizeMap(input.Headers)
@@ -64,11 +70,9 @@ func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events
 
 	if !constantTimeEquals(apiKey, h.expectedAPIKey) {
 		log.Printf(`{"level":"info","msg":"authorizer deny","reason":"invalid_or_missing_key"}`)
-		sentry.NewMeter(ctx).Count("authorizer.deny", 1,
-			sentry.WithAttributes(attribute.String("reason", "invalid_or_missing_key")),
-		)
-		return deny()
+		return deny("invalid_or_missing_key")
 	}
+	sentry.NewMeter(ctx).Count("authorizer.allow", 1)
 	return generatePolicy("user", "Allow", methodArn), nil
 }
 
@@ -135,18 +139,7 @@ func InitSentry() {
 	if dsn == "" {
 		return
 	}
-	err := sentry.Init(sentry.ClientOptions{
-		Dsn:              dsn,
-		Environment:      os.Getenv("SENTRY_ENVIRONMENT"),
-		Release:          os.Getenv("SENTRY_RELEASE"),
-		AttachStacktrace: true,
-		SampleRate:       1.0,
-		EnableTracing:    true,
-		TracesSampleRate: 0.5,
-		MaxBreadcrumbs:   50,
-		SendDefaultPII:   false,
-	})
-	if err != nil {
+	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
 		log.Printf("sentry init: %v", err)
 	}
 }
