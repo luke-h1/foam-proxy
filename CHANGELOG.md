@@ -20,6 +20,10 @@ All notable changes to this project will be documented in this file.
 
 - Update changelog [skip ci]
 
+- **(release)** 0.2.2 [skip ci]
+
+- **(lambda)** Update go version (#47)
+
 ## [0.2.1] - 2026-03-03
 
 ### Bug Fixes
