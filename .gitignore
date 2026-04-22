@@ -65,3 +65,7 @@ terraform.rc
 node_modules
 .idea
 /build
+
+docs
+
+.gocache

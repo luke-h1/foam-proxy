@@ -9,9 +9,7 @@ concurrency:
 permissions: write-all
 env:
   TF_VAR_env: staging
-  TF_VAR_twitch_client_id: ${{ secrets.TWITCH_CLIENT_ID }}
   TF_VAR_api_key: ${{ secrets.API_KEY }}
-  TF_VAR_twitch_client_secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
   TF_VAR_private_key: ${{ secrets.STAGING_PRIVATE_KEY }}
@@ -21,6 +19,12 @@ env:
   TF_VAR_git_sha: ${{ github.sha }}
   TF_VAR_authorizer_dsn: ${{ secrets.SENTRY_AUTHORIZER_DSN }}
   TF_VAR_proxy_dsn: ${{ secrets.SENTRY_PROXY_DSN }}
+  TF_VAR_app_twitch_client_id: ${{ secrets.TWITCH_CLIENT_ID }}
+  TF_VAR_app_twitch_client_secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
+  TF_VAR_menubar_twitch_client_id: ${{ secrets.TWITCH_CLIENT_ID }}
+  TF_VAR_menubar_twitch_client_secret: ${{ secrets.TWITCH_CLIENT_SECRET }}
+  TF_VAR_pushgateway_url: ${{ secrets.PUSHGATEWAY_URL }}
+  TF_VAR_pushgateway_auth_header: ${{ secrets.PUSHGATEWAY_AUTH_HEADER }}
 
 jobs:
   validate:

@@ -2,15 +2,36 @@ variable "env" {
   type        = string
   description = "The environment to deploy to"
 }
-
-variable "twitch_client_id" {
+variable "app_twitch_client_id" {
   type        = string
-  description = "the twitch client id to use"
+  description = "The Twitch client ID for foam-app. Maps to `TWITCH_CLIENT_ID_APP`."
 }
 
-variable "twitch_client_secret" {
+variable "app_twitch_client_secret" {
   type        = string
-  description = "the twitch client secret to use"
+  description = "The Twitch client secret for foam-app. Maps to `TWITCH_CLIENT_SECRET_APP`."
+}
+
+variable "app_redirect_uri" {
+  type        = string
+  description = "The redirect URI for foam-app. Maps to `REDIRECT_URI_FOAM_APP`."
+  default     = "foam://"
+}
+
+variable "menubar_twitch_client_id" {
+  type        = string
+  description = "The Twitch client ID for foam-menubar. Maps to `TWITCH_CLIENT_ID_MENUBAR`."
+}
+
+variable "menubar_twitch_client_secret" {
+  type        = string
+  description = "The Twitch client secret for foam-menubar. Maps to `TWITCH_CLIENT_SECRET_MENUBAR`."
+}
+
+variable "menubar_redirect_uri" {
+  type        = string
+  description = "The redirect URI for foam-menubar. Maps to `REDIRECT_URI_MENUBAR`."
+  default     = "foammenubar://"
 }
 
 variable "zone_id" {
@@ -80,5 +101,22 @@ variable "authorizer_dsn" {
 variable "proxy_dsn" {
   type        = string
   description = "the dsn of the authorizer sentry project"
+  sensitive   = true
+}
+
+variable "proxy_apps" {
+  type        = string
+  description = "The list of apps that the proxy handles. Maps to `PROXY_APPS`."
+  default     = "foam-app, foam-menubar"
+}
+
+variable "pushgateway_url" {
+  type        = string
+  description = "Pushgateway base URL"
+}
+
+variable "pushgateway_auth_header" {
+  type        = string
+  description = "Optional auth header to send to the Pushgateway ingress"
   sensitive   = true
 }
