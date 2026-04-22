@@ -13,7 +13,6 @@ permissions:
 
 env:
   TF_VAR_env: staging
-  TF_VAR_api_key: ${{ secrets.API_KEY }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
   TF_VAR_private_key: ${{ secrets.STAGING_PRIVATE_KEY }}
@@ -49,6 +48,7 @@ jobs:
           AUTHORIZER_DSN: op://ci-cd/foam-proxy-staging/SENTRY_AUTH_DSN
           PUSHGATEWAY_URL: op://ci-cd/foam-proxy-staging/PUSHGATEWAY_URL
           PUSHGATEWAY_AUTH_HEADER: op://ci-cd/foam-proxy-staging/PUSHGATEWAY_AUTH_HEADER
+          API_KEY: op://ci-cd/foam-proxy-staging/API_KEY
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables
@@ -61,6 +61,7 @@ jobs:
           echo "TF_VAR_authorizer_dsn=$AUTHORIZER_DSN" >> $GITHUB_ENV
           echo "TF_VAR_pushgateway_url=$PUSHGATEWAY_URL" >> $GITHUB_ENV
           echo "TF_VAR_pushgateway_auth_header=$PUSHGATEWAY_AUTH_HEADER" >> $GITHUB_ENV
+          echo "TF_VAR_api_key=$API_KEY" >> $GITHUB_ENV
 
       - name: Install
         uses: ./.github/actions/install
