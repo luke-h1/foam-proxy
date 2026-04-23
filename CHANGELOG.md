@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 - **(infrastructure)** Strip v
 
 
+### Features
+
+- **(proxy)** Support multiple apps (#48)
+
+
 ### Miscellaneous
 
 - **(release)** Vvv0.2.1 [skip ci]
@@ -25,6 +30,8 @@ All notable changes to this project will be documented in this file.
 - **(lambda)** Update go version (#47)
 
 - Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
 
 ## [0.2.1] - 2026-03-03
 
