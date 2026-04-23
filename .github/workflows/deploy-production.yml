@@ -14,7 +14,6 @@ permissions:
 
 env:
   TF_VAR_env: production
-  TF_VAR_api_key: ${{ secrets.STAGING_API_KEY }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
   TF_VAR_private_key: ${{ secrets.PRODUCTION_PRIVATE_KEY }}
@@ -44,14 +43,24 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_CLIENT_ID
-          TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_CLIENT_SECRET
+          APP_TWITCH_CLIENT_ID: op://ci-cd/foam-proxy-production/APP_TWITCH_CLIENT_ID
+          APP_TWITCH_CLIENT_SECRET: op://ci-cd/foam-proxy-production/APP_TWITCH_CLIENT_SECRET
+          MENUBAR_TWITCH_CLIENT_ID: op://ci-cd/foam-proxy-production/MENUBAR_TWITCH_CLIENT_ID
+          MENUBAR_TWITCH_CLIENT_SECRET: op://ci-cd/foam-proxy-production/MENUBAR_TWITCH_CLIENT_SECRET
+          PUSHGATEWAY_URL: op://ci-cd/foam-proxy-production/PUSHGATEWAY_URL
+          PUSHGATEWAY_AUTH_HEADER: op://ci-cd/foam-proxy-production/PUSHGATEWAY_AUTH_HEADER
+          API_KEY: op://ci-cd/foam-proxy-production/API_KEY
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables
         run: |
-          echo "TF_VAR_twitch_client_id=$TWITCH_CLIENT_ID" >> $GITHUB_ENV
-          echo "TF_VAR_twitch_client_secret=$TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "TF_VAR_app_twitch_client_id=$APP_TWITCH_CLIENT_ID" >> $GITHUB_ENV
+          echo "TF_VAR_app_twitch_client_secret=$APP_TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "TF_VAR_menubar_twitch_client_id=$MENUBAR_TWITCH_CLIENT_ID" >> $GITHUB_ENV
+          echo "TF_VAR_menubar_twitch_client_secret=$MENUBAR_TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "TF_VAR_pushgateway_url=$PUSHGATEWAY_URL" >> $GITHUB_ENV
+          echo "TF_VAR_pushgateway_auth_header=$PUSHGATEWAY_AUTH_HEADER" >> $GITHUB_ENV
+          echo "TF_VAR_api_key=$API_KEY" >> $GITHUB_ENV
           
       - name: Install
         uses: ./.github/actions/install

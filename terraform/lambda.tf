@@ -38,14 +38,27 @@ resource "aws_lambda_function" "lambda" {
   architectures = ["arm64"]
   environment {
     variables = {
-      DEPLOYED_AT          = timestamp()
-      DEPLOYED_BY          = var.deployed_by
-      GIT_SHA              = var.git_sha
-      TWITCH_CLIENT_ID     = var.twitch_client_id
-      TWITCH_CLIENT_SECRET = var.twitch_client_secret
-      PROXY_DSN            = var.proxy_dsn
-      SENTRY_ENVIRONMENT   = var.env
-      SENTRY_RELEASE       = var.git_sha
+      DEPLOYED_AT = timestamp()
+      DEPLOYED_BY = var.deployed_by
+      GIT_SHA     = var.git_sha
+
+
+      TWITCH_CLIENT_ID_APP     = var.app_twitch_client_id
+      TWITCH_CLIENT_SECRET_APP = var.app_twitch_client_secret
+      REDIRECT_URI_FOAM_APP    = var.app_redirect_uri
+
+      TWITCH_CLIENT_ID_MENUBAR     = var.menubar_twitch_client_id
+      TWITCH_CLIENT_SECRET_MENUBAR = var.menubar_twitch_client_secret
+      REDIRECT_URI_MENUBAR         = var.menubar_redirect_uri
+
+      PROXY_APPS = var.proxy_apps
+
+      PUSHGATEWAY_URL         = var.pushgateway_url
+      PUSHGATEWAY_AUTH_HEADER = var.pushgateway_auth_header
+
+      PROXY_DSN          = var.proxy_dsn
+      SENTRY_ENVIRONMENT = var.env
+      SENTRY_RELEASE     = var.git_sha
     }
   }
   tags = merge(var.tags, {

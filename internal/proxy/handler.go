@@ -10,29 +10,48 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
+	"github.com/foam/proxy/internal/observability"
 	"github.com/foam/proxy/internal/proxy/services"
 	"github.com/getsentry/sentry-go"
 )
 
 type Handler struct {
 	handlers *Handlers
+	metrics  *observability.Metrics
 }
 
 func NewHandler() (*Handler, error) {
-	config, err := config.LoadEnv()
-
+	cfg, err := config.LoadEnv()
 	if err != nil {
 		log.Printf("Config load failed: %v", err)
+		return nil, err
+	}
+	metrics, err := observability.Init("foam-proxy", configuredApps(cfg.Apps))
+	if err != nil {
+		log.Printf("observability init failed, continuing without metrics: %v", err)
+		metrics = nil
 	}
 
-	var twitchService = services.NewTwitchService(config.TwitchClientID, config.TwitchClientSecret, config.TwitchTimeout)
+	twitchServices := make(map[string]tokenService, len(cfg.Apps))
 
-	handlers := NewHandlers(config, twitchService)
-	return &Handler{handlers: handlers}, nil
+	for appName, appCfg := range cfg.Apps {
+		twitchServices[appName] = services.NewTwitchService(
+			appName,
+			appCfg.TwitchClientID,
+			appCfg.TwitchClientSecret,
+			cfg.TwitchTimeout,
+			metrics,
+		)
+	}
+
+	handlers := NewHandlers(cfg, twitchServices)
+	return &Handler{handlers: handlers, metrics: metrics}, nil
 }
 
 func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
 	defer sentry.Flush(2 * time.Second)
+
+	start := time.Now()
 
 	if input == nil {
 		return apiResponse(500, DefaultHeaders(), map[string]string{"error": "invalid request"}), nil
@@ -55,7 +74,21 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 		scope.SetTag("path", input.Path)
 	})
 	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q}`, requestID, input.Path, requestURL)
-	status, headers, body := handler.handlers.Route(input.Path, requestURL, input.QueryStringParameters)
+
+	status, headers, body := handler.handlers.Route(ctx, input.Path, requestURL, input.QueryStringParameters)
+
+	app := ""
+	if input.QueryStringParameters != nil {
+		app = input.QueryStringParameters["app"]
+	}
+
+	if handler.metrics != nil {
+		handler.metrics.RecordRequest(ctx, input.Path, app, status, time.Since(start))
+		if err := handler.metrics.PushWithTimeout(2 * time.Second); err != nil {
+			log.Printf("metrics push failed: %v", err)
+		}
+	}
+
 	return &events.APIGatewayProxyResponse{
 		StatusCode: status,
 		Headers:    headers,
@@ -107,4 +140,12 @@ func InitSentry() {
 	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
 		log.Printf("sentry init: %v", err)
 	}
+}
+
+func configuredApps(apps map[string]config.AppConfig) []string {
+	out := make([]string, 0, len(apps))
+	for app := range apps {
+		out = append(out, app)
+	}
+	return out
 }
