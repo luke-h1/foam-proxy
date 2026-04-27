@@ -31,7 +31,7 @@ variable "menubar_twitch_client_secret" {
 variable "menubar_redirect_uri" {
   type        = string
   description = "The redirect URI for foam-menubar. Maps to `REDIRECT_URI_MENUBAR`."
-  default     = "foammenubar://"
+  default     = "foammenubar://oauth/callback"
 }
 
 variable "zone_id" {
