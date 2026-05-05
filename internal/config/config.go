@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultTwitchTimeout = 20
+	defaultTwitchTimeout = 20 * time.Second
 )
 
 var allowedApps = map[string]appEnvVarNames{
