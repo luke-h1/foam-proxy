@@ -5,96 +5,140 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
 	"github.com/foam/proxy/internal/proxy/services"
 	"github.com/getsentry/sentry-go"
 )
 
-type Handlers struct {
+type ProxyRequests struct {
 	config *config.Proxy
 	twitch *services.TwitchService
 }
 
-func NewHandlers(cfg *config.Proxy, twitch *services.TwitchService) *Handlers {
-	return &Handlers{config: cfg, twitch: twitch}
+func NewProxyRequests(cfg *config.Proxy, twitch *services.TwitchService) *ProxyRequests {
+	return &ProxyRequests{config: cfg, twitch: twitch}
 }
 
-func (handlers *Handlers) Health() string {
+func (p *ProxyRequests) Handle(req *events.APIGatewayProxyRequest) Response {
+	if req == nil {
+		return p.jsonResponse(500, map[string]string{"error": "invalid request"})
+	}
+
+	switch req.Path {
+	case "/api/pending":
+		return p.handlePending()
+	case "/api/proxy":
+		return p.handleProxy()
+	case "/api/token":
+		return p.handleToken()
+	case "/api/refresh-token":
+		return p.handleRefreshToken(req)
+	case "/api/healthcheck":
+		return p.handleHealth()
+	case "/api/version":
+		return p.handleVersion()
+	default:
+		return p.jsonResponse(404, map[string]string{"error": "not found"})
+	}
+}
+
+func (p *ProxyRequests) handleHealth() Response {
 	meter := sentry.NewMeter(context.Background())
 	meter.Count("health.check", 1)
 
-	body, _ := json.Marshal(map[string]string{
+	return p.jsonResponse(200, map[string]string{
 		"status": "OK",
 	})
-	return string(body)
 }
 
-func (handlers *Handlers) Pending() string {
+func (p *ProxyRequests) handlePending() Response {
 	safeLog("[AUTHDBG] pending page served", map[string]string{
 		"target": "foam://",
 	})
-	return redirectPage("Foam - Pending", "foam://")
+	return htmlResponse(200, redirectPage("Foam - Pending", "foam://"))
 }
 
-func (h *Handlers) Proxy() string {
+func (p *ProxyRequests) handleProxy() Response {
 	safeLog("[AUTHDBG] proxy page served", map[string]string{
 		"target": "foam://",
 	})
-	return redirectPage("Foam - Redirecting", "foam://")
+	return htmlResponse(200, redirectPage("Foam - Redirecting", "foam://"))
 }
 
-func (handlers *Handlers) Token() string {
-	data, err := handlers.twitch.DefaultToken()
+func (p *ProxyRequests) handleToken() Response {
+	data, err := p.twitch.DefaultToken()
 
 	if err != nil {
-		body, _ := json.Marshal(map[string]interface{}{
+		return p.jsonResponse(200, map[string]interface{}{
 			"data":  nil,
 			"error": err.Error(),
 		})
-		return string(body)
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{"data": data, "error": nil})
-	return string(body)
+	return p.jsonResponse(200, map[string]interface{}{"data": data, "error": nil})
 }
 
-func (handlers *Handlers) RefreshToken(token string) string {
+func (p *ProxyRequests) handleRefreshToken(req *events.APIGatewayProxyRequest) Response {
+	token := ""
+	if req.QueryStringParameters != nil {
+		token = req.QueryStringParameters["token"]
+	}
+
 	if token == "" {
-		body, _ := json.Marshal(map[string]interface{}{
+		return p.jsonResponse(400, map[string]interface{}{
 			"data":  nil,
 			"error": "token query param is required",
 		})
-		return string(body)
 	}
 
-	data, err := handlers.twitch.RefreshToken(token)
+	data, err := p.twitch.RefreshToken(token)
 	if err != nil {
-		body, _ := json.Marshal(map[string]interface{}{
+		return p.jsonResponse(200, map[string]interface{}{
 			"data":  nil,
 			"error": err.Error(),
 		})
-		return string(body)
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{"data": data, "error": nil})
-	return string(body)
+	return p.jsonResponse(200, map[string]interface{}{"data": data, "error": nil})
 }
 
-func (handlers *Handlers) Version() string {
+func (p *ProxyRequests) handleVersion() Response {
 	out := map[string]string{
 		"deployedBy": "unknown",
 		"deployedAt": "unknown",
 		"gitSHA":     "unknown",
 	}
 
-	if handlers.config != nil {
-		out["deployedBy"] = handlers.config.DeployedBy
-		out["deployedAt"] = handlers.config.DeployedAt
-		out["gitSHA"] = handlers.config.GitSHA
+	if p.config != nil {
+		out["deployedBy"] = p.config.DeployedBy
+		out["deployedAt"] = p.config.DeployedAt
+		out["gitSHA"] = p.config.GitSHA
 	}
 
-	body, _ := json.Marshal(out)
-	return string(body)
+	return p.jsonResponse(200, out)
+}
+
+func (p *ProxyRequests) jsonResponse(statusCode int, body interface{}) Response {
+	raw, err := json.Marshal(body)
+	if err != nil {
+		raw = []byte(`{"error":"internal server error"}`)
+	}
+	return Response{
+		StatusCode: statusCode,
+		Headers:    DefaultHeaders(),
+		Body:       string(raw),
+	}
+}
+
+func htmlResponse(statusCode int, body string) Response {
+	headers := DefaultHeaders()
+	headers["Content-Type"] = "text/html"
+	return Response{
+		StatusCode: statusCode,
+		Headers:    headers,
+		Body:       body,
+	}
 }
 
 func redirectPage(title, targetPrefix string) string {

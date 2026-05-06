@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultTwitchTimeout = 20
+	defaultTwitchTimeout = 20 * time.Second
 )
 
 type Proxy struct {

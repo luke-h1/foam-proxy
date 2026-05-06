@@ -16,7 +16,7 @@ import (
 )
 
 type Handler struct {
-	handlers *Handlers
+	proxyRequests *ProxyRequests
 }
 
 func redactValue(value string) string {
@@ -55,16 +55,14 @@ func sortedKeys(values map[string]string) []string {
 }
 
 func NewHandler() (*Handler, error) {
-	config, err := config.LoadEnv()
-
+	cfg, err := config.LoadEnv()
 	if err != nil {
-		log.Printf("Config load failed: %v", err)
+		return nil, err
 	}
 
-	var twitchService = services.NewTwitchService(config.TwitchClientID, config.TwitchClientSecret, config.TwitchTimeout)
-
-	handlers := NewHandlers(config, twitchService)
-	return &Handler{handlers: handlers}, nil
+	twitchService := services.NewTwitchService(cfg.TwitchClientID, cfg.TwitchClientSecret, cfg.TwitchTimeout)
+	proxyRequests := NewProxyRequests(cfg, twitchService)
+	return &Handler{proxyRequests: proxyRequests}, nil
 }
 
 func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
@@ -91,12 +89,12 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 		scope.SetTag("path", input.Path)
 	})
 	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q,"method":%q,"query":%s,"query_keys":%q}`, requestID, input.Path, requestURL, method, mustJSON(sanitizeQuery(input.QueryStringParameters)), sortedKeys(input.QueryStringParameters))
-	status, headers, body := handler.handlers.Route(input.Path, requestURL, input.QueryStringParameters)
-	log.Printf(`{"level":"info","msg":"response","request_id":%q,"path":%q,"status":%d,"content_type":%q,"location":%q,"body_preview":%q}`, requestID, input.Path, status, headers["Content-Type"], headers["Location"], bodyPreview(body))
+	response := handler.proxyRequests.Handle(input)
+	log.Printf(`{"level":"info","msg":"response","request_id":%q,"path":%q,"status":%d,"content_type":%q,"location":%q,"body_preview":%q}`, requestID, input.Path, response.StatusCode, response.Headers["Content-Type"], response.Headers["Location"], bodyPreview(response.Body))
 	return &events.APIGatewayProxyResponse{
-		StatusCode: status,
-		Headers:    headers,
-		Body:       body,
+		StatusCode: response.StatusCode,
+		Headers:    response.Headers,
+		Body:       response.Body,
 	}, nil
 }
 
