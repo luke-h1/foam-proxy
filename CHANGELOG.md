@@ -26,6 +26,8 @@ All notable changes to this project will be documented in this file.
 
 - Update changelog [skip ci]
 
+- **(release)** 0.2.2 [skip ci]
+
 ## [0.2.1] - 2026-03-03
 
 ### Bug Fixes
