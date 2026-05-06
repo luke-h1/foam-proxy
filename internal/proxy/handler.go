@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -16,6 +17,41 @@ import (
 
 type Handler struct {
 	handlers *Handlers
+}
+
+func redactValue(value string) string {
+	if value == "" {
+		return ""
+	}
+	if len(value) <= 8 {
+		return value
+	}
+	return value[:8] + "…"
+}
+
+func sanitizeQuery(query map[string]string) map[string]string {
+	if len(query) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(query))
+	for key, value := range query {
+		switch key {
+		case "access_token", "code", "refresh_token", "state":
+			out[key] = redactValue(value)
+		default:
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func sortedKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func NewHandler() (*Handler, error) {
@@ -54,13 +90,29 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 		scope.SetTag("request_id", requestID)
 		scope.SetTag("path", input.Path)
 	})
-	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q}`, requestID, input.Path, requestURL)
+	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q,"method":%q,"query":%s,"query_keys":%q}`, requestID, input.Path, requestURL, method, mustJSON(sanitizeQuery(input.QueryStringParameters)), sortedKeys(input.QueryStringParameters))
 	status, headers, body := handler.handlers.Route(input.Path, requestURL, input.QueryStringParameters)
+	log.Printf(`{"level":"info","msg":"response","request_id":%q,"path":%q,"status":%d,"content_type":%q,"location":%q,"body_preview":%q}`, requestID, input.Path, status, headers["Content-Type"], headers["Location"], bodyPreview(body))
 	return &events.APIGatewayProxyResponse{
 		StatusCode: status,
 		Headers:    headers,
 		Body:       body,
 	}, nil
+}
+
+func bodyPreview(body string) string {
+	if len(body) <= 240 {
+		return body
+	}
+	return body[:240] + "…"
+}
+
+func mustJSON(value interface{}) string {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return `{}`
+	}
+	return string(raw)
 }
 
 func apiResponse(status int, headers map[string]string, body interface{}) *events.APIGatewayProxyResponse {

@@ -30,10 +30,16 @@ func (handlers *Handlers) Health() string {
 }
 
 func (handlers *Handlers) Pending() string {
+	safeLog("[AUTHDBG] pending page served", map[string]string{
+		"target": "foam://",
+	})
 	return redirectPage("Foam - Pending", "foam://")
 }
 
 func (h *Handlers) Proxy() string {
+	safeLog("[AUTHDBG] proxy page served", map[string]string{
+		"target": "foam://",
+	})
 	return redirectPage("Foam - Redirecting", "foam://")
 }
 
@@ -98,11 +104,15 @@ func redirectPage(title, targetPrefix string) string {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <title>%s</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
   </head>
   <body>
     <h1>Redirecting…</h1>
     <p>If nothing happens automatically, return to Foam.</p>
-    <script>
+    <a id="open-foam" href="%s">Open Foam</a>
+    <script data-cfasync="false">
       const search = window.location.search.replace(/^\?/, '');
       const hash = window.location.hash.replace(/^#/, '');
       const params = new URLSearchParams(search);
@@ -113,8 +123,23 @@ func redirectPage(title, targetPrefix string) string {
       }
 
       const query = params.toString();
-      window.location.replace(query ? '%s?' + query : '%s');
+      const redirectUrl = query ? '%s?' + query : '%s';
+      const openFoam = document.getElementById('open-foam');
+
+      if (openFoam) {
+        openFoam.setAttribute('href', redirectUrl);
+      }
+
+      window.location.replace(redirectUrl);
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 150);
     </script>
   </body>
-</html>`, title, targetPrefix, targetPrefix)
+</html>`, title, targetPrefix, targetPrefix, targetPrefix)
+}
+
+func safeLog(message string, fields map[string]string) {
+	body, _ := json.Marshal(fields)
+	fmt.Printf(`{"level":"info","msg":%q,"fields":%s}`+"\n", message, string(body))
 }
