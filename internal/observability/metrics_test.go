@@ -1,60 +1,45 @@
 package observability
 
 import (
+	"bytes"
 	"context"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
+
+	"github.com/prometheus/common/expfmt"
 )
 
 func TestMetricsPushesRecordedRequestAndConfigInfo(t *testing.T) {
-	t.Setenv("AWS_LAMBDA_LOG_STREAM_NAME", "stream-1")
 	t.Setenv("GIT_SHA", "abc123")
 	t.Setenv("SENTRY_ENVIRONMENT", "staging")
 
-	var (
-		mu          sync.Mutex
-		requestPath string
-		requestBody string
-	)
+	metrics := NewRuntime("foam-proxy", []string{"foam-app", "foam-menubar"})
+	pusher := &fakePusher{}
+	metrics.pusher = pusher
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		mu.Lock()
-		requestPath = r.URL.Path
-		requestBody = string(body)
-		mu.Unlock()
-		w.WriteHeader(http.StatusAccepted)
-	}))
-	defer server.Close()
-
-	t.Setenv("PUSHGATEWAY_URL", server.URL)
-
-	metrics, err := Init("foam-proxy", []string{"foam-app", "foam-menubar"})
-	if err != nil {
-		t.Fatalf("Init() error = %v", err)
-	}
-
-	metrics.RecordTwitchRequest(context.Background(), "default_token", "foam-app", "success", http.StatusOK, 25*time.Millisecond)
-	metrics.RecordRequest(context.Background(), "/api/version", "foam-app", http.StatusOK, 50*time.Millisecond)
+	metrics.RecordTwitchSuccess(context.Background(), "default_token", "foam-app", 200, 25*time.Millisecond)
+	metrics.RecordRequest(context.Background(), "/api/version", "foam-app", 200, 50*time.Millisecond)
 
 	if err := metrics.Push(context.Background()); err != nil {
 		t.Fatalf("Push() error = %v", err)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
-	if requestPath != "/metrics/job/foam-proxy/instance/stream-1" {
-		t.Fatalf("push path = %q", requestPath)
+	if pusher.calls != 1 {
+		t.Fatalf("pusher.calls = %d, want 1", pusher.calls)
 	}
+
+	var body bytes.Buffer
+	metricFamilies, err := metrics.registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather() error = %v", err)
+	}
+	for _, family := range metricFamilies {
+		if _, err := expfmt.MetricFamilyToText(&body, family); err != nil {
+			t.Fatalf("MetricFamilyToText() error = %v", err)
+		}
+	}
+	requestBody := body.String()
 
 	for _, needle := range []string{
 		`foam_proxy_requests_total{app="foam-app",route="/api/version",status_code_class="2xx"} 1`,
@@ -82,4 +67,13 @@ func TestNormalizePushgatewayURLTrimsTrailingSlash(t *testing.T) {
 	if got != "https://pushgateway.example.com" {
 		t.Fatalf("normalizePushgatewayURL() = %q", got)
 	}
+}
+
+type fakePusher struct {
+	calls int
+}
+
+func (f *fakePusher) PushContext(context.Context) error {
+	f.calls++
+	return nil
 }

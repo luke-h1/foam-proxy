@@ -10,16 +10,30 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/getsentry/sentry-go/attribute"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/prometheus/common/expfmt"
 )
 
+type ProxyRuntime interface {
+	RecordRequest(ctx context.Context, route, app string, statusCode int, duration time.Duration)
+	RecordTwitchSuccess(ctx context.Context, operation, app string, statusCode int, duration time.Duration)
+	RecordTwitchFailure(ctx context.Context, operation, app, reason string, statusCode int, duration time.Duration, responseBody string, err error)
+	RecordHealthCheck(ctx context.Context)
+	Push(ctx context.Context) error
+}
+
+type AuthorizerRuntime interface {
+	RecordAuthorization(ctx context.Context, outcome, reason string)
+}
+
 type pushContextPusher interface {
 	PushContext(ctx context.Context) error
 }
 
-type Metrics struct {
+type Runtime struct {
 	registry              *prometheus.Registry
 	pusher                pushContextPusher
 	pushMu                sync.Mutex
@@ -30,7 +44,7 @@ type Metrics struct {
 	configInfo            *prometheus.GaugeVec
 }
 
-func Init(serviceName string, apps []string) (*Metrics, error) {
+func NewRuntime(serviceName string, apps []string) *Runtime {
 	registry := prometheus.NewRegistry()
 
 	requestsTotal := prometheus.NewCounterVec(
@@ -86,7 +100,7 @@ func Init(serviceName string, apps []string) (*Metrics, error) {
 		configInfo.WithLabelValues(app, gitSHA, environment).Set(1)
 	}
 
-	m := &Metrics{
+	runtime := &Runtime{
 		registry:              registry,
 		requestsTotal:         requestsTotal,
 		requestDuration:       requestDuration,
@@ -97,7 +111,7 @@ func Init(serviceName string, apps []string) (*Metrics, error) {
 
 	gatewayURL := normalizePushgatewayURL(os.Getenv("PUSHGATEWAY_URL"))
 	if gatewayURL == "" {
-		return m, nil
+		return runtime
 	}
 
 	pusher := push.New(gatewayURL, serviceName).
@@ -110,43 +124,32 @@ func Init(serviceName string, apps []string) (*Metrics, error) {
 	}
 
 	if err := pusher.Error(); err != nil {
-		return nil, err
+		return runtime
 	}
-	m.pusher = pusher
+	runtime.pusher = pusher
 
-	return m, nil
+	return runtime
 }
 
-func (m *Metrics) Push(ctx context.Context) error {
-	if m == nil || m.pusher == nil {
+func (r *Runtime) Push(ctx context.Context) error {
+	if r == nil || r.pusher == nil {
 		return nil
 	}
 
-	m.pushMu.Lock()
-	defer m.pushMu.Unlock()
+	r.pushMu.Lock()
+	defer r.pushMu.Unlock()
 
-	return m.pusher.PushContext(ctx)
+	return r.pusher.PushContext(ctx)
 }
 
-func (m *Metrics) PushWithTimeout(timeout time.Duration) error {
-	if m == nil {
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return m.Push(ctx)
-}
-
-func (m *Metrics) RecordRequest(_ context.Context, route, app string, statusCode int, duration time.Duration) {
-	if m == nil {
+func (r *Runtime) RecordRequest(_ context.Context, route, app string, statusCode int, duration time.Duration) {
+	if r == nil {
 		return
 	}
 
 	labels := []string{route, normalizeApp(app), statusClass(statusCode)}
-	m.requestsTotal.WithLabelValues(labels...).Inc()
-	m.requestDuration.WithLabelValues(labels...).Observe(duration.Seconds())
+	r.requestsTotal.WithLabelValues(labels...).Inc()
+	r.requestDuration.WithLabelValues(labels...).Observe(duration.Seconds())
 }
 
 func normalizeApp(app string) string {
@@ -157,14 +160,69 @@ func normalizeApp(app string) string {
 	return app
 }
 
-func (m *Metrics) RecordTwitchRequest(_ context.Context, operation, app, outcome string, statusCode int, duration time.Duration) {
-	if m == nil {
+func (r *Runtime) RecordTwitchSuccess(ctx context.Context, operation, app string, statusCode int, duration time.Duration) {
+	r.recordTwitchMetrics(operation, app, "success", statusCode, duration)
+	meter := sentry.NewMeter(ctx)
+	meter.Count(twitchCounterName(operation), 1, sentry.WithAttributes(attribute.String("outcome", "success")))
+	meter.Distribution(twitchLatencyName(operation), float64(duration.Milliseconds()), sentry.WithUnit(sentry.UnitMillisecond))
+}
+
+func (r *Runtime) RecordTwitchFailure(ctx context.Context, operation, app, reason string, statusCode int, duration time.Duration, responseBody string, err error) {
+	r.recordTwitchMetrics(operation, app, "error", statusCode, duration)
+
+	attrs := []attribute.Builder{attribute.String("outcome", "error")}
+	if reason != "" {
+		attrs = append(attrs, attribute.String("reason", reason))
+	}
+	meter := sentry.NewMeter(ctx)
+	meter.Count(twitchCounterName(operation), 1, sentry.WithAttributes(attrs...))
+	if duration >= 0 {
+		meter.Distribution(twitchLatencyName(operation), float64(duration.Milliseconds()), sentry.WithUnit(sentry.UnitMillisecond))
+	}
+
+	if err == nil {
+		return
+	}
+
+	sentry.WithScope(func(scope *sentry.Scope) {
+		scope.SetTag("twitch.operation", operation)
+		scope.SetTag("twitch.error_reason", reason)
+		scope.SetLevel(sentry.LevelError)
+		if duration >= 0 {
+			scope.SetExtra("latency_ms", float64(duration.Milliseconds()))
+		}
+		if statusCode > 0 {
+			scope.SetExtra("http_status", statusCode)
+		}
+		if responseBody != "" {
+			scope.SetExtra("twitch.response_body", responseBody)
+		}
+		sentry.CaptureException(err)
+	})
+}
+
+func (r *Runtime) RecordHealthCheck(ctx context.Context) {
+	meter := sentry.NewMeter(ctx)
+	meter.Count("health.check", 1)
+}
+
+func (r *Runtime) RecordAuthorization(ctx context.Context, outcome, reason string) {
+	meter := sentry.NewMeter(ctx)
+	attrs := []attribute.Builder{attribute.String("outcome", outcome)}
+	if reason != "" {
+		attrs = append(attrs, attribute.String("reason", reason))
+	}
+	meter.Count("authorizer.authorization", 1, sentry.WithAttributes(attrs...))
+}
+
+func (r *Runtime) recordTwitchMetrics(operation, app, outcome string, statusCode int, duration time.Duration) {
+	if r == nil {
 		return
 	}
 
 	labels := []string{operation, normalizeApp(app), outcome, statusClass(statusCode)}
-	m.twitchRequestsTotal.WithLabelValues(labels...).Inc()
-	m.twitchRequestDuration.WithLabelValues(labels...).Observe(duration.Seconds())
+	r.twitchRequestsTotal.WithLabelValues(labels...).Inc()
+	r.twitchRequestDuration.WithLabelValues(labels...).Observe(duration.Seconds())
 }
 
 func statusClass(code int) string {
@@ -244,3 +302,24 @@ func envOrUnknown(key string) string {
 	}
 	return value
 }
+
+func twitchCounterName(operation string) string {
+	switch operation {
+	case "refresh_token":
+		return "twitch.refresh_token.request"
+	default:
+		return "twitch.token.request"
+	}
+}
+
+func twitchLatencyName(operation string) string {
+	switch operation {
+	case "refresh_token":
+		return "twitch.refresh_token.latency_ms"
+	default:
+		return "twitch.token.latency_ms"
+	}
+}
+
+var _ ProxyRuntime = (*Runtime)(nil)
+var _ AuthorizerRuntime = (*Runtime)(nil)

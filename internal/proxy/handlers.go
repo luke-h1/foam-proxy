@@ -8,13 +8,16 @@ import (
 	"strings"
 
 	"github.com/foam/proxy/internal/config"
+	"github.com/foam/proxy/internal/observability"
 	"github.com/foam/proxy/internal/proxy/services"
-	"github.com/getsentry/sentry-go"
 )
 
+var errNotFound = fmt.Errorf("not found")
+
 type Handlers struct {
-	config *config.Proxy
-	twitch map[string]tokenService
+	config  *config.Proxy
+	twitch  map[string]tokenService
+	runtime observability.ProxyRuntime
 }
 
 type tokenService interface {
@@ -22,13 +25,12 @@ type tokenService interface {
 	RefreshToken(ctx context.Context, token string) (*services.TwitchRefreshTokenResponse, error)
 }
 
-func NewHandlers(cfg *config.Proxy, twitch map[string]tokenService) *Handlers {
-	return &Handlers{config: cfg, twitch: twitch}
+func NewHandlers(cfg *config.Proxy, twitch map[string]tokenService, runtime observability.ProxyRuntime) *Handlers {
+	return &Handlers{config: cfg, twitch: twitch, runtime: runtime}
 }
 
 func (handlers *Handlers) Health() string {
-	meter := sentry.NewMeter(context.Background())
-	meter.Count("health.check", 1)
+	handlers.runtime.RecordHealthCheck(context.Background())
 
 	body, _ := json.Marshal(map[string]string{
 		"status": "OK",
@@ -56,7 +58,7 @@ func (handlers *Handlers) Token(ctx context.Context, app string) (string, error)
 	service, err := handlers.serviceForApp(app)
 
 	if err != nil {
-		return errorBody(err), err
+		return clientErrorBody(err), err
 	}
 
 	data, err := service.DefaultToken(ctx)
@@ -77,7 +79,7 @@ func (handlers *Handlers) RefreshToken(ctx context.Context, app, token string) (
 	service, err := handlers.serviceForApp(app)
 
 	if err != nil {
-		return errorBody(err), err
+		return clientErrorBody(err), err
 	}
 
 	if token == "" {
@@ -154,35 +156,32 @@ func buildRedirectURI(baseURI, requestURL string) (string, error) {
 }
 
 func (handlers *Handlers) configForApp(app string) (*config.AppConfig, error) {
-	if app == "" {
-		return nil, fmt.Errorf("app query param is required")
+	if handlers.config == nil {
+		return nil, fmt.Errorf("config unavailable")
 	}
 
-	if handlers.config == nil || handlers.config.Apps == nil {
-		return nil, fmt.Errorf("unknown app %q", app)
+	configuredApp, err := handlers.config.Apps.Get(app)
+	if err != nil {
+		return nil, err
 	}
 
-	appConfig, ok := handlers.config.Apps[app]
-
-	if !ok {
-		return nil, fmt.Errorf("unknown app %q", app)
-	}
-
+	appConfig := configuredApp.Config
 	return &appConfig, nil
 }
 
 func (handlers *Handlers) serviceForApp(app string) (tokenService, error) {
-	if app == "" {
-		return nil, fmt.Errorf("app query param is required")
+	configuredApp, err := handlers.config.Apps.Get(app)
+	if err != nil {
+		return nil, err
 	}
 
 	if handlers.twitch == nil {
-		return nil, fmt.Errorf("unknown app %q", app)
+		return nil, fmt.Errorf("token service unavailable")
 	}
 
-	service, ok := handlers.twitch[app]
+	service, ok := handlers.twitch[configuredApp.Name]
 	if !ok || service == nil {
-		return nil, fmt.Errorf("unknown app %q", app)
+		return nil, fmt.Errorf("token service unavailable")
 	}
 
 	return service, nil
@@ -195,4 +194,23 @@ func errorBody(err error) string {
 	})
 
 	return string(body)
+}
+
+func clientErrorBody(err error) string {
+	if lookupErr, ok := err.(*config.AppLookupError); ok {
+		return errorBody(fmt.Errorf("%s", clientErrorMessage(lookupErr)))
+	}
+
+	return errorBody(err)
+}
+
+func clientErrorMessage(err *config.AppLookupError) string {
+	switch err.Code {
+	case config.AppLookupMissingApp:
+		return "app query param is required"
+	case config.AppLookupInvalidApp:
+		return "invalid app"
+	default:
+		return "invalid request"
+	}
 }

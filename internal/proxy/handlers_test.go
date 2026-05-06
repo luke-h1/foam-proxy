@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/foam/proxy/internal/config"
+	"github.com/foam/proxy/internal/observability"
 	"github.com/foam/proxy/internal/proxy/services"
 )
 
@@ -48,10 +49,13 @@ func TestBuildRedirectURIPreservesDoubleSlashForCustomScheme(t *testing.T) {
 
 func TestRouteProxyMissingAppReturnsBadRequest(t *testing.T) {
 	handlers := NewHandlers(&config.Proxy{
-		Apps: map[string]config.AppConfig{
-			"foam-app": {RedirectURI: "foam://"},
-		},
-	}, nil)
+		Apps: config.NewAppCapabilities([]config.ConfiguredApp{{
+			Name: "foam-app",
+			Config: config.AppConfig{
+				RedirectURI: "foam://",
+			},
+		}}),
+	}, nil, observability.NewRuntime("test", nil))
 
 	status, _, body := handlers.Route(context.Background(), "/api/proxy", "https://proxy.example/api/proxy?code=123", map[string]string{
 		"code": "123",
@@ -68,10 +72,13 @@ func TestRouteProxyMissingAppReturnsBadRequest(t *testing.T) {
 
 func TestRouteProxyUnknownAppReturnsBadRequest(t *testing.T) {
 	handlers := NewHandlers(&config.Proxy{
-		Apps: map[string]config.AppConfig{
-			"foam-app": {RedirectURI: "foam://"},
-		},
-	}, nil)
+		Apps: config.NewAppCapabilities([]config.ConfiguredApp{{
+			Name: "foam-app",
+			Config: config.AppConfig{
+				RedirectURI: "foam://",
+			},
+		}}),
+	}, nil, observability.NewRuntime("test", nil))
 
 	status, _, body := handlers.Route(context.Background(), "/api/proxy", "https://proxy.example/api/proxy?app=other&code=123", map[string]string{
 		"app":  "other",
@@ -82,7 +89,7 @@ func TestRouteProxyUnknownAppReturnsBadRequest(t *testing.T) {
 		t.Fatalf("status = %d, want 400", status)
 	}
 
-	if !strings.Contains(body, "unknown app") {
+	if !strings.Contains(body, "invalid app") {
 		t.Fatalf("body = %q", body)
 	}
 }
@@ -91,10 +98,15 @@ func TestTokenUsesSelectedAppService(t *testing.T) {
 	appService := &fakeTwitchService{}
 	menubarService := &fakeTwitchService{}
 
-	handlers := NewHandlers(&config.Proxy{}, map[string]tokenService{
+	handlers := NewHandlers(&config.Proxy{
+		Apps: config.NewAppCapabilities([]config.ConfiguredApp{
+			{Name: "foam-app"},
+			{Name: "foam-menubar"},
+		}),
+	}, map[string]tokenService{
 		"foam-app":     appService,
 		"foam-menubar": menubarService,
-	})
+	}, observability.NewRuntime("test", nil))
 
 	_, err := handlers.Token(context.Background(), "foam-menubar")
 	if err != nil {
@@ -113,10 +125,15 @@ func TestRefreshTokenUsesSelectedAppService(t *testing.T) {
 	appService := &fakeTwitchService{}
 	menubarService := &fakeTwitchService{}
 
-	handlers := NewHandlers(&config.Proxy{}, map[string]tokenService{
+	handlers := NewHandlers(&config.Proxy{
+		Apps: config.NewAppCapabilities([]config.ConfiguredApp{
+			{Name: "foam-app"},
+			{Name: "foam-menubar"},
+		}),
+	}, map[string]tokenService{
 		"foam-app":     appService,
 		"foam-menubar": menubarService,
-	})
+	}, observability.NewRuntime("test", nil))
 
 	_, err := handlers.RefreshToken(context.Background(), "foam-app", "refresh-123")
 	if err != nil {
@@ -132,9 +149,13 @@ func TestRefreshTokenUsesSelectedAppService(t *testing.T) {
 }
 
 func TestTokenReturnsUnderlyingServiceError(t *testing.T) {
-	handlers := NewHandlers(&config.Proxy{}, map[string]tokenService{
+	handlers := NewHandlers(&config.Proxy{
+		Apps: config.NewAppCapabilities([]config.ConfiguredApp{
+			{Name: "foam-app"},
+		}),
+	}, map[string]tokenService{
 		"foam-app": &fakeTwitchService{defaultTokenErr: errors.New("boom")},
-	})
+	}, observability.NewRuntime("test", nil))
 
 	body, err := handlers.Token(context.Background(), "foam-app")
 	if err == nil {
@@ -143,5 +164,30 @@ func TestTokenReturnsUnderlyingServiceError(t *testing.T) {
 
 	if !strings.Contains(body, "boom") {
 		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestTokenReturnsClientSafeInvalidAppError(t *testing.T) {
+	handlers := NewHandlers(&config.Proxy{
+		Apps: config.NewAppCapabilities([]config.ConfiguredApp{{
+			Name: "foam-app",
+			Config: config.AppConfig{
+				RedirectURI: "foam://",
+			},
+		}}),
+	}, map[string]tokenService{
+		"foam-app": &fakeTwitchService{},
+	}, observability.NewRuntime("test", nil))
+
+	body, err := handlers.Token(context.Background(), "other-app")
+	if err == nil {
+		t.Fatal("Token() error = nil, want error")
+	}
+
+	if !strings.Contains(body, "invalid app") {
+		t.Fatalf("body = %q", body)
+	}
+	if strings.Contains(body, "other-app") {
+		t.Fatalf("body leaks app key: %q", body)
 	}
 }

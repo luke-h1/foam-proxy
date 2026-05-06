@@ -26,8 +26,46 @@ var allowedApps = map[string]appEnvVarNames{
 	},
 }
 
+type WarningCode string
+
+const (
+	WarningDuplicateApp WarningCode = "duplicate_app"
+)
+
+type Warning struct {
+	Code    WarningCode
+	App     string
+	Message string
+}
+
+type AppLookupErrorCode string
+
+const (
+	AppLookupMissingApp AppLookupErrorCode = "missing_app"
+	AppLookupInvalidApp AppLookupErrorCode = "invalid_app"
+)
+
+type AppLookupError struct {
+	Code AppLookupErrorCode
+	App  string
+}
+
+func (e *AppLookupError) Error() string {
+	switch e.Code {
+	case AppLookupMissingApp:
+		return "missing app"
+	case AppLookupInvalidApp:
+		if e.App == "" {
+			return "invalid app"
+		}
+		return fmt.Sprintf("invalid app %q", e.App)
+	default:
+		return "app lookup failed"
+	}
+}
+
 type Proxy struct {
-	Apps          map[string]AppConfig
+	Apps          AppCapabilities
 	TwitchTimeout time.Duration
 	DeployedBy    string
 	DeployedAt    string
@@ -40,50 +78,112 @@ type AppConfig struct {
 	RedirectURI        string
 }
 
-func LoadEnv() (*Proxy, error) {
+type ConfiguredApp struct {
+	Name   string
+	Config AppConfig
+}
+
+type AppCapabilities struct {
+	ordered []ConfiguredApp
+	byName  map[string]ConfiguredApp
+}
+
+func NewAppCapabilities(apps []ConfiguredApp) AppCapabilities {
+	ordered := make([]ConfiguredApp, len(apps))
+	copy(ordered, apps)
+
+	byName := make(map[string]ConfiguredApp, len(apps))
+	for _, app := range ordered {
+		byName[app.Name] = app
+	}
+
+	return AppCapabilities{
+		ordered: ordered,
+		byName:  byName,
+	}
+}
+
+func (a AppCapabilities) All() []ConfiguredApp {
+	out := make([]ConfiguredApp, len(a.ordered))
+	copy(out, a.ordered)
+	return out
+}
+
+func (a AppCapabilities) Names() []string {
+	out := make([]string, 0, len(a.ordered))
+	for _, app := range a.ordered {
+		out = append(out, app.Name)
+	}
+	return out
+}
+
+func (a AppCapabilities) Get(app string) (ConfiguredApp, error) {
+	app = strings.TrimSpace(app)
+	if app == "" {
+		return ConfiguredApp{}, &AppLookupError{Code: AppLookupMissingApp}
+	}
+
+	configuredApp, ok := a.byName[app]
+	if !ok {
+		return ConfiguredApp{}, &AppLookupError{Code: AppLookupInvalidApp, App: app}
+	}
+
+	return configuredApp, nil
+}
+
+func LoadEnv() (*Proxy, []Warning, error) {
 	appNames := parseAppNames(os.Getenv("PROXY_APPS"))
 
 	if len(appNames) == 0 {
-		return nil, fmt.Errorf("PROXY_APPS is required")
+		return nil, nil, fmt.Errorf("PROXY_APPS is required")
 	}
 
-	apps := make(map[string]AppConfig, len(appNames))
-	seenAppKeys := make(map[string]string, len(appNames))
+	configuredApps := make([]ConfiguredApp, 0, len(appNames))
+	seenApps := make(map[string]struct{}, len(appNames))
+	warnings := make([]Warning, 0)
 
 	for _, appName := range appNames {
+		appName = strings.TrimSpace(appName)
+		if _, ok := seenApps[appName]; ok {
+			warnings = append(warnings, Warning{
+				Code:    WarningDuplicateApp,
+				App:     appName,
+				Message: fmt.Sprintf("duplicate app %q ignored", appName),
+			})
+			continue
+		}
+		seenApps[appName] = struct{}{}
+
 		envNames, err := appEnvNames(appName)
 		if err != nil {
-			return nil, err
+			return nil, warnings, err
 		}
-
-		appKey := appConfigKey(envNames)
-		if prior, ok := seenAppKeys[appKey]; ok {
-			return nil, fmt.Errorf("duplicate app configuration after normalization: %q conflicts with %q", prior, appName)
-		}
-		seenAppKeys[appKey] = appName
 
 		clientID := os.Getenv(envNames.clientID)
 		clientSecret := os.Getenv(envNames.clientSecret)
 		redirectURI := os.Getenv(envNames.redirectURI)
 
 		if clientID == "" || clientSecret == "" || redirectURI == "" {
-			return nil, fmt.Errorf("%s, %s and %s are required for app %q", envNames.clientID, envNames.clientSecret, envNames.redirectURI, appName)
+			return nil, warnings, fmt.Errorf("%s, %s and %s are required for app %q", envNames.clientID, envNames.clientSecret, envNames.redirectURI, appName)
 		}
 
-		apps[appName] = AppConfig{
-			TwitchClientID:     clientID,
-			TwitchClientSecret: clientSecret,
-			RedirectURI:        redirectURI,
-		}
+		configuredApps = append(configuredApps, ConfiguredApp{
+			Name: appName,
+			Config: AppConfig{
+				TwitchClientID:     clientID,
+				TwitchClientSecret: clientSecret,
+				RedirectURI:        redirectURI,
+			},
+		})
 	}
 
 	return &Proxy{
-		Apps:          apps,
+		Apps:          NewAppCapabilities(configuredApps),
 		TwitchTimeout: defaultTwitchTimeout,
 		DeployedBy:    os.Getenv("DEPLOYED_BY"),
 		DeployedAt:    os.Getenv("DEPLOYED_AT"),
 		GitSHA:        os.Getenv("GIT_SHA"),
-	}, nil
+	}, warnings, nil
 }
 
 func SentryOptions(dsn string) sentry.ClientOptions {
@@ -112,10 +212,6 @@ func parseAppNames(raw string) []string {
 		apps = append(apps, name)
 	}
 	return apps
-}
-
-func appConfigKey(envNames appEnvVarNames) string {
-	return strings.Join([]string{envNames.clientID, envNames.clientSecret, envNames.redirectURI}, "|")
 }
 
 type appEnvVarNames struct {

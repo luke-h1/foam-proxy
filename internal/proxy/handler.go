@@ -17,35 +17,36 @@ import (
 
 type Handler struct {
 	handlers *Handlers
-	metrics  *observability.Metrics
+	runtime  observability.ProxyRuntime
 }
 
 func NewHandler() (*Handler, error) {
-	cfg, err := config.LoadEnv()
+	cfg, warnings, err := config.LoadEnv()
 	if err != nil {
 		log.Printf("Config load failed: %v", err)
 		return nil, err
 	}
-	metrics, err := observability.Init("foam-proxy", configuredApps(cfg.Apps))
-	if err != nil {
-		log.Printf("observability init failed, continuing without metrics: %v", err)
-		metrics = nil
+	for _, warning := range warnings {
+		log.Printf(`{"level":"warn","msg":"config warning","code":%q,"app":%q,"detail":%q}`, warning.Code, warning.App, warning.Message)
 	}
 
-	twitchServices := make(map[string]tokenService, len(cfg.Apps))
+	runtime := observability.NewRuntime("foam-proxy", cfg.Apps.Names())
 
-	for appName, appCfg := range cfg.Apps {
-		twitchServices[appName] = services.NewTwitchService(
-			appName,
-			appCfg.TwitchClientID,
-			appCfg.TwitchClientSecret,
+	configuredApps := cfg.Apps.All()
+	twitchServices := make(map[string]tokenService, len(configuredApps))
+
+	for _, app := range configuredApps {
+		twitchServices[app.Name] = services.NewTwitchService(
+			app.Name,
+			app.Config.TwitchClientID,
+			app.Config.TwitchClientSecret,
 			cfg.TwitchTimeout,
-			metrics,
+			runtime,
 		)
 	}
 
-	handlers := NewHandlers(cfg, twitchServices)
-	return &Handler{handlers: handlers, metrics: metrics}, nil
+	handlers := NewHandlers(cfg, twitchServices, runtime)
+	return &Handler{handlers: handlers, runtime: runtime}, nil
 }
 
 func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
@@ -82,11 +83,11 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 		app = input.QueryStringParameters["app"]
 	}
 
-	if handler.metrics != nil {
-		handler.metrics.RecordRequest(ctx, input.Path, app, status, time.Since(start))
-		if err := handler.metrics.PushWithTimeout(2 * time.Second); err != nil {
-			log.Printf("metrics push failed: %v", err)
-		}
+	handler.runtime.RecordRequest(ctx, input.Path, app, status, time.Since(start))
+	pushCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := handler.runtime.Push(pushCtx); err != nil {
+		log.Printf("metrics push failed: %v", err)
 	}
 
 	return &events.APIGatewayProxyResponse{
@@ -140,12 +141,4 @@ func InitSentry() {
 	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
 		log.Printf("sentry init: %v", err)
 	}
-}
-
-func configuredApps(apps map[string]config.AppConfig) []string {
-	out := make([]string, 0, len(apps))
-	for app := range apps {
-		out = append(out, app)
-	}
-	return out
 }

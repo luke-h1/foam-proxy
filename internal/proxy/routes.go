@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"encoding/json"
 )
 
 func (handlers *Handlers) Route(ctx context.Context, path, requestURL string, query map[string]string) (statusCode int, headers map[string]string, body string) {
@@ -22,8 +21,7 @@ func (handlers *Handlers) Route(ctx context.Context, path, requestURL string, qu
 	case "/api/proxy":
 		redirectURI, err := handlers.RedirectURI(app, requestURL)
 		if err != nil {
-			b, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-			return 400, headers, string(b)
+			return 400, headers, clientErrorBody(err)
 		}
 		headers["Location"] = redirectURI
 		return 302, headers, handlers.Proxy()
@@ -56,7 +54,6 @@ func (handlers *Handlers) Route(ctx context.Context, path, requestURL string, qu
 		return 200, headers, handlers.Version(ctx)
 
 	default:
-		b, _ := json.Marshal(map[string]string{"error": "not found"})
-		return 404, headers, string(b)
+		return 404, headers, errorBody(errNotFound)
 	}
 }

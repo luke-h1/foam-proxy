@@ -8,8 +8,8 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
+	"github.com/foam/proxy/internal/observability"
 	"github.com/getsentry/sentry-go"
-	"github.com/getsentry/sentry-go/attribute"
 )
 
 type RequestEvent struct {
@@ -22,17 +22,20 @@ type RequestEvent struct {
 
 type Handler struct {
 	expectedAPIKey string
+	runtime        observability.AuthorizerRuntime
 }
 
 func NewHandler() *Handler {
+	runtime := observability.NewRuntime("foam-authorizer", nil)
 	key := os.Getenv("API_KEY")
 	if key != "" {
 		return &Handler{
 			expectedAPIKey: key,
+			runtime:        runtime,
 		}
 	}
 	log.Print("API_KEY not set")
-	return &Handler{}
+	return &Handler{runtime: runtime}
 }
 
 func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events.APIGatewayCustomAuthorizerResponse, error) {
@@ -43,11 +46,7 @@ func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events
 	}
 
 	deny := func(reason string) (events.APIGatewayCustomAuthorizerResponse, error) {
-		if reason != "" {
-			sentry.NewMeter(ctx).Count("authorizer.deny", 1,
-				sentry.WithAttributes(attribute.String("reason", reason)),
-			)
-		}
+		h.runtime.RecordAuthorization(ctx, "deny", reason)
 		return generatePolicy("user", "Deny", methodArn), nil
 	}
 
@@ -72,7 +71,7 @@ func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events
 		log.Printf(`{"level":"info","msg":"authorizer deny","reason":"invalid_or_missing_key"}`)
 		return deny("invalid_or_missing_key")
 	}
-	sentry.NewMeter(ctx).Count("authorizer.allow", 1)
+	h.runtime.RecordAuthorization(ctx, "allow", "")
 	return generatePolicy("user", "Allow", methodArn), nil
 }
 
