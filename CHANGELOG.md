@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 
 - **(proxy)** Implicit code redirect
 
+- **(proxy)** Implicit code redirect
+
 
 ### Miscellaneous
 
@@ -33,6 +35,8 @@ All notable changes to this project will be documented in this file.
 - **(release)** 0.2.2 [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
 
 ## [0.2.1] - 2026-03-03
 
