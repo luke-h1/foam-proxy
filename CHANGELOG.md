@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 
 - **(infrastructure)** Strip v
 
+- **(proxy)** Implicit code redirect
+
 
 ### Miscellaneous
 
@@ -25,6 +27,8 @@ All notable changes to this project will be documented in this file.
 - **(lambda)** Update go version (#47)
 
 - Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
 
 - **(release)** 0.2.2 [skip ci]
 
