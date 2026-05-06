@@ -15,7 +15,7 @@ variable "app_twitch_client_secret" {
 variable "app_redirect_uri" {
   type        = string
   description = "The redirect URI for foam-app. Maps to `REDIRECT_URI_FOAM_APP`."
-  default     = "foam://"
+  default     = "https://auth.foam-app.com/api/proxy?app=foam-app"
 }
 
 variable "menubar_twitch_client_id" {

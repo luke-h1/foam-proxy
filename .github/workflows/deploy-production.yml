@@ -16,6 +16,7 @@ env:
   TF_VAR_env: production
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
+  TF_VAR_app_redirect_uri: https://auth.foam-app.com/api/proxy?app=foam-app
   TF_VAR_private_key: ${{ secrets.PRODUCTION_PRIVATE_KEY }}
   TF_VAR_certificate_body: ${{ secrets.PRODUCTION_CERTIFICATE_BODY }}
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
@@ -56,6 +57,7 @@ jobs:
         run: |
           echo "TF_VAR_app_twitch_client_id=$APP_TWITCH_CLIENT_ID" >> $GITHUB_ENV
           echo "TF_VAR_app_twitch_client_secret=$APP_TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "TF_VAR_app_redirect_uri=https://auth.foam-app.com/api/proxy?app=foam-app" >> $GITHUB_ENV
           echo "TF_VAR_menubar_twitch_client_id=$MENUBAR_TWITCH_CLIENT_ID" >> $GITHUB_ENV
           echo "TF_VAR_menubar_twitch_client_secret=$MENUBAR_TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
           echo "TF_VAR_pushgateway_url=$PUSHGATEWAY_URL" >> $GITHUB_ENV
