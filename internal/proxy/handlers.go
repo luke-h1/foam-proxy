@@ -3,7 +3,7 @@ package proxy
 import (
 	"context"
 	"encoding/json"
-	"net/url"
+	"fmt"
 
 	"github.com/foam/proxy/internal/config"
 	"github.com/foam/proxy/internal/proxy/services"
@@ -30,19 +30,11 @@ func (handlers *Handlers) Health() string {
 }
 
 func (handlers *Handlers) Pending() string {
-	return `<!DOCTYPE html>
-	<html>
-	  <head><title>Foam - Pending</title></head>
-	  <body>
-		<h1>Your request is pending</h1>
-		<p>Please wait while we process your request.</p>
-	  </body>
-	</html>`
+	return redirectPage("Foam - Pending", "foam://")
 }
 
 func (h *Handlers) Proxy() string {
-	body, _ := json.Marshal(map[string]string{"message": "redirecting to app"})
-	return string(body)
+	return redirectPage("Foam - Redirecting", "foam://")
 }
 
 func (handlers *Handlers) Token() string {
@@ -99,11 +91,30 @@ func (handlers *Handlers) Version() string {
 	return string(body)
 }
 
-// redirects to the app with any query params
-func RedirectURI(requestURL string) (string, error) {
-	u, err := url.Parse(requestURL)
-	if err != nil {
-		return "", err
-	}
-	return "foam://?" + u.RawQuery, nil
+func redirectPage(title, targetPrefix string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>%s</title>
+  </head>
+  <body>
+    <h1>Redirecting…</h1>
+    <p>If nothing happens automatically, return to Foam.</p>
+    <script>
+      const search = window.location.search.replace(/^\?/, '');
+      const hash = window.location.hash.replace(/^#/, '');
+      const params = new URLSearchParams(search);
+      const hashParams = new URLSearchParams(hash);
+
+      for (const [key, value] of hashParams.entries()) {
+        params.set(key, value);
+      }
+
+      const query = params.toString();
+      window.location.replace(query ? '%s?' + query : '%s');
+    </script>
+  </body>
+</html>`, title, targetPrefix, targetPrefix)
 }

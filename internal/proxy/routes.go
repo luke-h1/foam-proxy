@@ -11,13 +11,8 @@ func (handlers *Handlers) Route(path, requestURL string, query map[string]string
 		return 200, headers, handlers.Pending()
 
 	case "/api/proxy":
-		redirectURI, err := RedirectURI(requestURL)
-		if err != nil {
-			b, _ := json.Marshal(map[string]interface{}{"error": "invalid request URL"})
-			return 500, headers, string(b)
-		}
-		headers["Location"] = redirectURI
-		return 302, headers, handlers.Proxy()
+		headers["Content-Type"] = "text/html"
+		return 200, headers, handlers.Proxy()
 
 	case "/api/token":
 		return 200, headers, handlers.Token()
