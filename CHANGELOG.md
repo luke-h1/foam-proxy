@@ -44,6 +44,12 @@ All notable changes to this project will be documented in this file.
 
 - **(release)** 0.2.2 [skip ci]
 
+- **(release)** 0.2.2 [skip ci]
+
+- **(api)** Swap staging for prod tokens
+
+- **(api)** Swap staging for prod tokens
+
 
 ### Refactor
 
