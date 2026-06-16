@@ -52,7 +52,7 @@ jobs:
         run: |
           echo "TF_VAR_twitch_client_id=$TWITCH_CLIENT_ID" >> $GITHUB_ENV
           echo "TF_VAR_twitch_client_secret=$TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
-          
+
       - name: Install
         uses: ./.github/actions/install
 
