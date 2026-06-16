@@ -50,6 +50,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Swap staging for prod tokens
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
