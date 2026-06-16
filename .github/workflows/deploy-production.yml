@@ -44,8 +44,8 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_CLIENT_ID
-          TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_CLIENT_SECRET
+          TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_PROD_CLIENT_ID
+          TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_PROD_CLIENT_SECRET
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables
