@@ -108,11 +108,7 @@ func TestProxyRequestsHandleMagic(t *testing.T) {
 		query       map[string]string
 		statusCode  int
 		contentType string
-		// wantParts must all be present in the body. For the success case these
-		// are the unescaped foam://auth deep link parts: the token reaches the
-		// app through the raw JS redirect URL, not the HTML-escaped href.
-		wantParts []string
-		// absentParts must never appear; the secret key must not be echoed back.
+		wantParts   []string
 		absentParts []string
 	}{
 		{
@@ -138,7 +134,6 @@ func TestProxyRequestsHandleMagic(t *testing.T) {
 				"foam-internal://auth?",
 				"access_token=ABC123",
 			},
-			// the production scheme must not be used when a valid variant is requested
 			absentParts: []string{"foam://auth?", "s3cret-review-key"},
 		},
 		{

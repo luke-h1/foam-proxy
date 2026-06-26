@@ -17,13 +17,10 @@ jobs:
     name: Refresh ${{ matrix.env }} magic link token
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Per-environment group: a slow/queued staging run must not block production.
     concurrency:
       group: refresh-magic-link-${{ matrix.env }}
       cancel-in-progress: false
     strategy:
-      # Independent blobs — one env failing (e.g. its secret is unset) must not
-      # cancel the other.
       fail-fast: false
       matrix:
         include:

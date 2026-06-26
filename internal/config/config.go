@@ -12,14 +12,9 @@ import (
 
 const (
 	defaultTwitchTimeout = 20 * time.Second
-	// DefaultAppScheme is the production app's custom URL scheme, used when a
-	// deployment doesn't set APP_SCHEME.
-	DefaultAppScheme = "foam"
+	DefaultAppScheme     = "foam"
 )
 
-// allowedAppSchemes are the custom URL schemes the Foam app registers, one per
-// build variant (see app.config.ts). Redirects are restricted to these so the
-// magic/proxy routes can't be used to bounce a token into an arbitrary scheme.
 var allowedAppSchemes = map[string]bool{
 	"foam":            true,
 	"foam-dev":        true,
@@ -28,14 +23,10 @@ var allowedAppSchemes = map[string]bool{
 	"foam-e2e":        true,
 }
 
-// IsAllowedAppScheme reports whether scheme is a known Foam variant scheme.
 func IsAllowedAppScheme(scheme string) bool {
 	return allowedAppSchemes[scheme]
 }
 
-// ResolveAppScheme returns requested when it's a known variant scheme, otherwise
-// the production default. requested comes from the untrusted ?scheme query param,
-// so the allowlist stops the redirect from targeting an arbitrary scheme.
 func ResolveAppScheme(requested string) string {
 	if IsAllowedAppScheme(requested) {
 		return requested
@@ -43,8 +34,6 @@ func ResolveAppScheme(requested string) string {
 	return DefaultAppScheme
 }
 
-// MagicLink is the stored test-account session the App Review magic link injects
-// into the app, bypassing the OAuth/2FA flow Apple's reviewers cannot complete.
 type MagicLink struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -60,8 +49,7 @@ type Proxy struct {
 	DeployedAt         string
 	GitSHA             string
 	MagicLink          *MagicLink
-	// MagicLinkAPIKey is the secret the magic route's ?key is checked against; empty disables it.
-	MagicLinkAPIKey string
+	MagicLinkAPIKey    string
 }
 
 func LoadEnv() (*Proxy, error) {
@@ -84,8 +72,6 @@ func LoadEnv() (*Proxy, error) {
 	}, nil
 }
 
-// parseMagicLink reads the optional MAGIC_LINK_BLOB env var; a missing or invalid
-// blob disables the magic link rather than failing boot.
 func parseMagicLink(raw string) *MagicLink {
 	if raw == "" {
 		return nil

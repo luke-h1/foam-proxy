@@ -121,9 +121,6 @@ func (p *ProxyRequests) handleRefreshToken(req *events.APIGatewayProxyRequest) R
 	return p.jsonResponse(200, map[string]interface{}{"data": data, "error": nil})
 }
 
-// handleMagic backs the App Review magic link, serving the stored session only
-// when ?key matches the configured secret. A missing or wrong key returns 404 so
-// the route never reveals its existence.
 func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response {
 	var magic *config.MagicLink
 	expectedKey := ""
@@ -143,14 +140,12 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 		return p.jsonResponse(404, map[string]string{"error": "not found"})
 	}
 
-	// Hash to fixed-length digests so the constant-time compare can't leak the secret's length.
 	providedKey := sha256.Sum256([]byte(key))
 	expected := sha256.Sum256([]byte(expectedKey))
 	if subtle.ConstantTimeCompare(providedKey[:], expected[:]) != 1 {
 		return p.jsonResponse(404, map[string]string{"error": "not found"})
 	}
 
-	// format=json returns the raw blob for in-app injection instead of the deep-link redirect.
 	if format == "json" {
 		safeLog("[AUTHDBG] magic link served", map[string]string{
 			"target": "json",
@@ -162,10 +157,11 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 	safeLog("[AUTHDBG] magic link served", map[string]string{
 		"target": scheme + "://auth",
 	})
+
+	// return deep-link for app-store reviewer
 	return noStore(htmlResponse(200, redirectTargetPage("Foam - Signing in", magicTargetURL(magic, scheme))))
 }
 
-// magicTokenType returns the blob's token type, defaulting to "bearer".
 func magicTokenType(magic *config.MagicLink) string {
 	if magic.TokenType == "" {
 		return "bearer"
