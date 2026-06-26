@@ -127,6 +127,15 @@ resource "aws_apigatewayv2_route" "lambda_route_version" {
   operation_name = "get version"
 }
 
+# Public route (no authorizer): the App Review magic link is opened from Safari,
+# which cannot send an x-api-key header. The ?key secret in the URL gates it.
+resource "aws_apigatewayv2_route" "lambda_route_magic" {
+  api_id         = aws_apigatewayv2_api.lambda.id
+  target         = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  route_key      = "GET /api/magic"
+  operation_name = "get magic"
+}
+
 resource "aws_apigatewayv2_route" "lambda_route_token" {
   api_id             = aws_apigatewayv2_api.lambda.id
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"

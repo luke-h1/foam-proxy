@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -10,7 +12,34 @@ import (
 
 const (
 	defaultTwitchTimeout = 20 * time.Second
+	DefaultAppScheme     = "foam"
 )
+
+var allowedAppSchemes = map[string]bool{
+	"foam":            true,
+	"foam-dev":        true,
+	"foam-internal":   true,
+	"foam-testflight": true,
+	"foam-e2e":        true,
+}
+
+func IsAllowedAppScheme(scheme string) bool {
+	return allowedAppSchemes[scheme]
+}
+
+func ResolveAppScheme(requested string) string {
+	if IsAllowedAppScheme(requested) {
+		return requested
+	}
+	return DefaultAppScheme
+}
+
+type MagicLink struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+}
 
 type Proxy struct {
 	TwitchClientID     string
@@ -19,6 +48,8 @@ type Proxy struct {
 	DeployedBy         string
 	DeployedAt         string
 	GitSHA             string
+	MagicLink          *MagicLink
+	MagicLinkAPIKey    string
 }
 
 func LoadEnv() (*Proxy, error) {
@@ -36,7 +67,28 @@ func LoadEnv() (*Proxy, error) {
 		DeployedBy:         os.Getenv("DEPLOYED_BY"),
 		DeployedAt:         os.Getenv("DEPLOYED_AT"),
 		GitSHA:             os.Getenv("GIT_SHA"),
+		MagicLink:          parseMagicLink(os.Getenv("MAGIC_LINK_BLOB")),
+		MagicLinkAPIKey:    os.Getenv("MAGIC_LINK_API_KEY"),
 	}, nil
+}
+
+func parseMagicLink(raw string) *MagicLink {
+	if raw == "" {
+		return nil
+	}
+
+	var magic MagicLink
+	if err := json.Unmarshal([]byte(raw), &magic); err != nil {
+		log.Printf("failed to parse MAGIC_LINK_BLOB: %v", err)
+		return nil
+	}
+
+	if magic.AccessToken == "" || magic.RefreshToken == "" {
+		log.Print("MAGIC_LINK_BLOB missing tokens; magic link disabled")
+		return nil
+	}
+
+	return &magic
 }
 
 func SentryOptions(dsn string) sentry.ClientOptions {

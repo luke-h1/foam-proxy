@@ -24,6 +24,7 @@ env:
   TF_VAR_git_sha: ${{ github.sha }}
   TF_VAR_authorizer_dsn: ${{ secrets.SENTRY_AUTHORIZER_DSN }}
   TF_VAR_proxy_dsn: ${{ secrets.SENTRY_PROXY_DSN }}
+  TF_VAR_magic_link_blob: ${{ secrets.MAGIC_LINK_BLOB_PRODUCTION }}
 
 jobs:
   release:
@@ -46,6 +47,7 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_PROD_CLIENT_ID
           TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_PROD_CLIENT_SECRET
+          TF_VAR_magic_link_api_key: op://ci-cd/foam-staging/MAGIC_LINK_API_KEY
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables
