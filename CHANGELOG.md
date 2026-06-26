@@ -65,6 +65,8 @@ All notable changes to this project will be documented in this file.
 
 - **(docs)** Get rid of ai generated readme
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
