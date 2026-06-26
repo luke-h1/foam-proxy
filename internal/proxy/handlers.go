@@ -2,8 +2,13 @@ package proxy
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"html"
+	"net/url"
+	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
@@ -34,6 +39,8 @@ func (p *ProxyRequests) Handle(req *events.APIGatewayProxyRequest) Response {
 		return p.handleToken()
 	case "/api/refresh-token":
 		return p.handleRefreshToken(req)
+	case "/api/magic":
+		return p.handleMagic(req)
 	case "/api/healthcheck":
 		return p.handleHealth()
 	case "/api/version":
@@ -64,6 +71,17 @@ func (p *ProxyRequests) handleProxy() Response {
 		"target": "foam://",
 	})
 	return htmlResponse(200, redirectPage("Foam - Redirecting", "foam://"))
+}
+
+// resolveScheme picks the magic-link redirect scheme from the request's ?scheme
+// query param, validated against the variant allowlist; anything else falls back
+// to the production scheme.
+func resolveScheme(req *events.APIGatewayProxyRequest) string {
+	requested := ""
+	if req != nil && req.QueryStringParameters != nil {
+		requested = req.QueryStringParameters["scheme"]
+	}
+	return config.ResolveAppScheme(requested)
 }
 
 func (p *ProxyRequests) handleToken() Response {
@@ -103,6 +121,87 @@ func (p *ProxyRequests) handleRefreshToken(req *events.APIGatewayProxyRequest) R
 	return p.jsonResponse(200, map[string]interface{}{"data": data, "error": nil})
 }
 
+// handleMagic backs the App Review magic link, serving the stored session only
+// when ?key matches the configured secret. A missing or wrong key returns 404 so
+// the route never reveals its existence.
+func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response {
+	var magic *config.MagicLink
+	expectedKey := ""
+	if p.config != nil {
+		magic = p.config.MagicLink
+		expectedKey = p.config.MagicLinkAPIKey
+	}
+
+	key := ""
+	format := ""
+	if req.QueryStringParameters != nil {
+		key = req.QueryStringParameters["key"]
+		format = req.QueryStringParameters["format"]
+	}
+
+	if magic == nil || expectedKey == "" || key == "" {
+		return p.jsonResponse(404, map[string]string{"error": "not found"})
+	}
+
+	// Hash to fixed-length digests so the constant-time compare can't leak the secret's length.
+	providedKey := sha256.Sum256([]byte(key))
+	expected := sha256.Sum256([]byte(expectedKey))
+	if subtle.ConstantTimeCompare(providedKey[:], expected[:]) != 1 {
+		return p.jsonResponse(404, map[string]string{"error": "not found"})
+	}
+
+	// format=json returns the raw blob for in-app injection instead of the deep-link redirect.
+	if format == "json" {
+		safeLog("[AUTHDBG] magic link served", map[string]string{
+			"target": "json",
+		})
+		return noStore(p.jsonResponse(200, magicTokenBlob(magic)))
+	}
+
+	scheme := resolveScheme(req)
+	safeLog("[AUTHDBG] magic link served", map[string]string{
+		"target": scheme + "://auth",
+	})
+	return noStore(htmlResponse(200, redirectTargetPage("Foam - Signing in", magicTargetURL(magic, scheme))))
+}
+
+// magicTokenType returns the blob's token type, defaulting to "bearer".
+func magicTokenType(magic *config.MagicLink) string {
+	if magic.TokenType == "" {
+		return "bearer"
+	}
+	return magic.TokenType
+}
+
+func magicTokenBlob(magic *config.MagicLink) map[string]interface{} {
+	blob := map[string]interface{}{
+		"access_token": magic.AccessToken,
+		"token_type":   magicTokenType(magic),
+	}
+	if magic.RefreshToken != "" {
+		blob["refresh_token"] = magic.RefreshToken
+	}
+	if magic.ExpiresIn > 0 {
+		blob["expires_in"] = magic.ExpiresIn
+	}
+	return blob
+}
+
+func magicTargetURL(magic *config.MagicLink, scheme string) string {
+	form := url.Values{}
+	form.Set("access_token", magic.AccessToken)
+	if magic.RefreshToken != "" {
+		form.Set("refresh_token", magic.RefreshToken)
+	}
+	form.Set("token_type", magicTokenType(magic))
+
+	if magic.ExpiresIn > 0 {
+		form.Set("expires_in", strconv.Itoa(magic.ExpiresIn))
+	}
+
+	return scheme + "://auth?" + form.Encode()
+}
+
 func (p *ProxyRequests) handleVersion() Response {
 	out := map[string]string{
 		"deployedBy": "unknown",
@@ -129,6 +228,11 @@ func (p *ProxyRequests) jsonResponse(statusCode int, body interface{}) Response 
 		Headers:    DefaultHeaders(),
 		Body:       string(raw),
 	}
+}
+
+func noStore(resp Response) Response {
+	resp.Headers["Cache-Control"] = "no-store"
+	return resp
 }
 
 func htmlResponse(statusCode int, body string) Response {
@@ -181,6 +285,41 @@ func redirectPage(title, targetPrefix string) string {
     </script>
   </body>
 </html>`, title, targetPrefix, targetPrefix, targetPrefix)
+}
+
+func redirectTargetPage(title, target string) string {
+	hrefAttr := html.EscapeString(target)
+	jsTarget, _ := json.Marshal(target)
+
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>%s</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+  </head>
+  <body>
+    <h1>Signing in…</h1>
+    <p>If nothing happens automatically, return to Foam.</p>
+    <a id="open-foam" href="%s">Open Foam</a>
+    <script data-cfasync="false">
+      const redirectUrl = %s;
+      const openFoam = document.getElementById('open-foam');
+
+      if (openFoam) {
+        openFoam.setAttribute('href', redirectUrl);
+      }
+
+      window.location.replace(redirectUrl);
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 150);
+    </script>
+  </body>
+</html>`, title, hrefAttr, string(jsTarget))
 }
 
 func safeLog(message string, fields map[string]string) {

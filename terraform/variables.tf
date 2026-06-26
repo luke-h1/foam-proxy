@@ -82,3 +82,17 @@ variable "proxy_dsn" {
   description = "the dsn of the authorizer sentry project"
   sensitive   = true
 }
+
+variable "magic_link_blob" {
+  type        = string
+  description = "JSON blob for the App Review magic link: {access_token, refresh_token, expires_in, token_type}. Empty disables the magic link."
+  default     = ""
+  sensitive   = true
+}
+
+variable "magic_link_api_key" {
+  type        = string
+  description = "Secret the magic route's ?key is compared against. Held separately from the magic_link_blob token data. Empty disables the magic link."
+  default     = ""
+  sensitive   = true
+}

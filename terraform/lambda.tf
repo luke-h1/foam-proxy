@@ -46,6 +46,8 @@ resource "aws_lambda_function" "lambda" {
       PROXY_DSN            = var.proxy_dsn
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
+      MAGIC_LINK_BLOB      = var.magic_link_blob
+      MAGIC_LINK_API_KEY   = var.magic_link_api_key
     }
   }
   tags = merge(var.tags, {
