@@ -12,6 +12,11 @@ All notable changes to this project will be documented in this file.
 - **(proxy)** Implicit code redirect
 
 
+### Features
+
+- **(api)** Add magic link support (#50)
+
+
 ### Miscellaneous
 
 - **(release)** Vvv0.2.1 [skip ci]
@@ -51,6 +56,8 @@ All notable changes to this project will be documented in this file.
 - **(api)** Swap staging for prod tokens
 
 - Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
 
 
 ### Refactor
