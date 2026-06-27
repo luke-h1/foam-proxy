@@ -170,7 +170,7 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 	var magic *config.MagicLink
 	expectedKey := ""
 	if p.config != nil {
-		magic = p.config.MagicLink
+		magic = p.resolveMagicLink()
 		expectedKey = p.config.MagicLinkAPIKey
 	}
 

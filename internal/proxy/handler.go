@@ -69,7 +69,7 @@ func NewHandler() (*Handler, error) {
 		store, storeErr := magiclink.NewStore(context.Background(), cfg.MagicLinkSSMParam)
 
 		if storeErr != nil {
-			log.Printf("magic-link SSM init failed, falling back to env var %w", storeErr)
+			log.Printf("magic-link SSM init failed, falling back to env var: %v", storeErr)
 		} else {
 			proxyRequests.magicStore = store
 		}

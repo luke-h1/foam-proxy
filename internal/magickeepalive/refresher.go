@@ -73,11 +73,11 @@ func (r *Refresher) Refresh(ctx context.Context) error {
 	blob, err := json.Marshal(next)
 
 	if err != nil {
-		return fmt.Errorf("Failed to marshal blog: %w", err)
+		return fmt.Errorf("failed to marshal blob: %w", err)
 	}
 
 	if err := r.store.Put(ctx, string(blob)); err != nil {
-		return fmt.Errorf("Failed to write blob %w", err)
+		return fmt.Errorf("failed to write blob: %w", err)
 	}
 	return nil
 }
