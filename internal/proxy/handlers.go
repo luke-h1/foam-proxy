@@ -18,7 +18,7 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-type magicLinkSource interface {
+type magicLinkGetter interface {
 	Get(ctx context.Context) (string, error)
 }
 
@@ -31,7 +31,7 @@ const magicCacheTTL = 60 * time.Second
 type ProxyRequests struct {
 	config     *config.Proxy
 	twitch     *services.TwitchService
-	magicStore magicLinkSource
+	magicStore magicLinkGetter
 	magicMu    sync.Mutex
 	magicCache *config.MagicLink
 	magicExp   time.Time
@@ -65,7 +65,11 @@ func (p *ProxyRequests) resolveMagicLink() *config.MagicLink {
 		})
 		return p.config.MagicLink
 	}
-	p.magicCache = config.ParseMagicLink(raw)
+	parsed := config.ParseMagicLink(raw)
+	if parsed == nil {
+		return p.config.MagicLink
+	}
+	p.magicCache = parsed
 	p.magicExp = time.Now().Add(magicCacheTTL)
 	return p.magicCache
 }

@@ -48,6 +48,7 @@ op_ref() {
   case "$1" in
     prod)    echo "op://ci-cd/foam-proxy-production/MAGIC_LINK_API_KEY" ;;
     staging) echo "op://ci-cd/foam-proxy-staging/MAGIC_LINK_API_KEY" ;;
+    *)       echo "error: op_ref expects 'prod' or 'staging', got '$1'" >&2; return 1 ;;
   esac
 }
 EXPIRES_IN="${MAGIC_LINK_EXPIRES_IN:-14400}"
