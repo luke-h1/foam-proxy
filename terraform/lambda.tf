@@ -5,7 +5,7 @@ locals {
   build_dir      = "${path.module}/.."
   proxy_zip      = "${local.build_dir}/build/proxy.zip"
   authorizer_zip = "${local.build_dir}/build/authorizer.zip"
-  keepalive_zip = "${local.build_dir}/build/magic-keepalive.zip"
+  keepalive_zip  = "${local.build_dir}/build/magic-keepalive.zip"
 
   magic_link_enabled   = var.reviewer_account_refresh_enabled
   magic_link_ssm_param = "/${var.project_name}/${var.env}/magic-link-blob"
