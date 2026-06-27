@@ -30,7 +30,7 @@ The `/api/magic` route serves a session token to App Store reviewers. Its blob l
 scripts/setup-magic-link.sh --env <prod|staging>   # mints token, prints blob + gate key
 ```
 
-- `magic_link_blob` → GitHub secret `MAGIC_LINK_BLOB_<ENV>`
+- `magic_link_blob` → GitHub secret `MAGIC_LINK_BLOB_<ENV>` — store the raw JSON only (`{"access_token":…}`), **no surrounding quotes**. The secret is passed verbatim into SSM as `TF_VAR_magic_link_blob`; wrapping quotes get stored literally, break `ParseMagicLink`, and make `/api/magic` 404.
 - `magic_link_api_key` → 1Password `op://ci-cd/foam-proxy-<env>/MAGIC_LINK_API_KEY` (same key value in both envs for time being)
 - Run **Deploy `<env>`** with `reviewer_account_refresh_enabled = true` (seeds SSM, serves `/api/magic`, starts the schedule), then verify:
 
