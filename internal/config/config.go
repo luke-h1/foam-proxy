@@ -48,8 +48,13 @@ type Proxy struct {
 	DeployedBy         string
 	DeployedAt         string
 	GitSHA             string
-	MagicLink          *MagicLink
-	MagicLinkAPIKey    string
+
+	// env-var fallback blob
+	// in prod - read from SSM param store
+	MagicLink       *MagicLink
+	MagicLinkAPIKey string
+
+	MagicLinkSSMParam string
 }
 
 func LoadEnv() (*Proxy, error) {
@@ -67,12 +72,13 @@ func LoadEnv() (*Proxy, error) {
 		DeployedBy:         os.Getenv("DEPLOYED_BY"),
 		DeployedAt:         os.Getenv("DEPLOYED_AT"),
 		GitSHA:             os.Getenv("GIT_SHA"),
-		MagicLink:          parseMagicLink(os.Getenv("MAGIC_LINK_BLOB")),
+		MagicLink:          ParseMagicLink(os.Getenv("MAGIC_LINK_BLOB")),
 		MagicLinkAPIKey:    os.Getenv("MAGIC_LINK_API_KEY"),
+		MagicLinkSSMParam:  os.Getenv("MAGIC_LINK_SSM_PARAM"),
 	}, nil
 }
 
-func parseMagicLink(raw string) *MagicLink {
+func ParseMagicLink(raw string) *MagicLink {
 	if raw == "" {
 		return nil
 	}

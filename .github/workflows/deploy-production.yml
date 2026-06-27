@@ -1,6 +1,11 @@
 name: Deploy production
 on:
   workflow_dispatch:
+    inputs:
+      reviewer_account_refresh_enabled:
+        description: "Enable the App Review magic link + token keepalive (turn on during review, off otherwise)"
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -14,6 +19,7 @@ permissions:
 
 env:
   TF_VAR_env: production
+  TF_VAR_reviewer_account_refresh_enabled: ${{ inputs.reviewer_account_refresh_enabled || false }}
   TF_VAR_api_key: ${{ secrets.STAGING_API_KEY }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
@@ -45,9 +51,9 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          TWITCH_CLIENT_ID: op://ci-cd/foam-staging/TWITCH_PROD_CLIENT_ID
-          TWITCH_CLIENT_SECRET: op://ci-cd/foam-staging/TWITCH_PROD_CLIENT_SECRET
-          TF_VAR_magic_link_api_key: op://ci-cd/foam-staging/MAGIC_LINK_API_KEY
+          TWITCH_CLIENT_ID: op://ci-cd/foam-proxy-production/TWITCH_CLIENT_ID
+          TWITCH_CLIENT_SECRET: op://ci-cd/foam-proxy-production/TWITCH_CLIENT_SECRET
+          TF_VAR_magic_link_api_key: op://ci-cd/foam-proxy-production/MAGIC_LINK_API_KEY
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables

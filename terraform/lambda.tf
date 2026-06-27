@@ -1,7 +1,53 @@
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 locals {
   build_dir      = "${path.module}/.."
   proxy_zip      = "${local.build_dir}/build/proxy.zip"
   authorizer_zip = "${local.build_dir}/build/authorizer.zip"
+  keepalive_zip  = "${local.build_dir}/build/magic-keepalive.zip"
+
+  magic_link_enabled   = var.reviewer_account_refresh_enabled
+  magic_link_ssm_param = "/${var.project_name}/${var.env}/magic-link-blob"
+  magic_link_ssm_arn   = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${local.magic_link_ssm_param}"
+
+}
+
+resource "aws_ssm_parameter" "magic_link_blob" {
+  count = local.magic_link_enabled ? 1 : 0
+  name  = local.magic_link_ssm_param
+  type  = "SecureString"
+  value = var.magic_link_blob
+  tags  = var.tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_magic_link_read" {
+  count = local.magic_link_enabled ? 1 : 0
+  name  = "${var.project_name}-${var.env}-magic-link-ssm-read"
+  role  = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = local.magic_link_ssm_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com" }
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_iam_role" "lambda_exec" {
@@ -46,7 +92,7 @@ resource "aws_lambda_function" "lambda" {
       PROXY_DSN            = var.proxy_dsn
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
-      MAGIC_LINK_BLOB      = var.magic_link_blob
+      MAGIC_LINK_SSM_PARAM = local.magic_link_enabled ? local.magic_link_ssm_param : ""
       MAGIC_LINK_API_KEY   = var.magic_link_api_key
     }
   }

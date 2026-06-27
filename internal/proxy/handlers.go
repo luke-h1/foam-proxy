@@ -9,6 +9,8 @@ import (
 	"html"
 	"net/url"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
@@ -16,13 +18,60 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
+type magicLinkGetter interface {
+	Get(ctx context.Context) (string, error)
+}
+
+// how often /api/magic re-reads SSM within one warm Lambda
+// instance.
+// short TTL keeps reviewers on a fresh token without hammering SSM.
+
+const magicCacheTTL = 60 * time.Second
+
 type ProxyRequests struct {
-	config *config.Proxy
-	twitch *services.TwitchService
+	config     *config.Proxy
+	twitch     *services.TwitchService
+	magicStore magicLinkGetter
+	magicMu    sync.Mutex
+	magicCache *config.MagicLink
+	magicExp   time.Time
 }
 
 func NewProxyRequests(cfg *config.Proxy, twitch *services.TwitchService) *ProxyRequests {
 	return &ProxyRequests{config: cfg, twitch: twitch}
+}
+
+func (p *ProxyRequests) resolveMagicLink() *config.MagicLink {
+	if p.magicStore == nil {
+		return p.config.MagicLink
+	}
+
+	p.magicMu.Lock()
+
+	defer p.magicMu.Unlock()
+
+	if !p.magicExp.IsZero() && time.Now().Before(p.magicExp) {
+		return p.magicCache
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	raw, err := p.magicStore.Get(ctx)
+
+	if err != nil {
+		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{
+			"error": err.Error(),
+		})
+		return p.config.MagicLink
+	}
+	parsed := config.ParseMagicLink(raw)
+	if parsed == nil {
+		return p.config.MagicLink
+	}
+	p.magicCache = parsed
+	p.magicExp = time.Now().Add(magicCacheTTL)
+	return p.magicCache
 }
 
 func (p *ProxyRequests) Handle(req *events.APIGatewayProxyRequest) Response {
@@ -125,7 +174,7 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 	var magic *config.MagicLink
 	expectedKey := ""
 	if p.config != nil {
-		magic = p.config.MagicLink
+		magic = p.resolveMagicLink()
 		expectedKey = p.config.MagicLinkAPIKey
 	}
 

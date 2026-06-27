@@ -41,8 +41,16 @@ SCOPES=(
   editor:manage:clips
 )
 
-# Shared gate key location (one key for both envs; prod setup mints it).
-OP_REF="op://ci-cd/foam-staging/MAGIC_LINK_API_KEY"
+# Gate key location, one item per environment (each holds its own MAGIC_LINK_API_KEY).
+# The key value is still shared across envs — prod setup mints it and you store the
+# same value in both items.
+op_ref() {
+  case "$1" in
+    prod)    echo "op://ci-cd/foam-proxy-production/MAGIC_LINK_API_KEY" ;;
+    staging) echo "op://ci-cd/foam-proxy-staging/MAGIC_LINK_API_KEY" ;;
+    *)       echo "error: op_ref expects 'prod' or 'staging', got '$1'" >&2; return 1 ;;
+  esac
+}
 EXPIRES_IN="${MAGIC_LINK_EXPIRES_IN:-14400}"
 
 MODE="setup"
@@ -130,11 +138,11 @@ setup() {
   if [[ "${ENV_TARGET}" == "prod" ]]; then
     key="$(gen_key)"
     blob_secret="MAGIC_LINK_BLOB_PRODUCTION"
-    key_dest="${OP_REF} — the shared gate key (both deploys read it)"
+    key_dest="$(op_ref prod) — the shared gate key (store the same value in $(op_ref staging) so both deploys match)"
   else
     key="${MAGIC_LINK_API_KEY:-}"
     blob_secret="MAGIC_LINK_BLOB_STAGING"
-    key_dest="reuses the shared ${OP_REF} from prod setup — no separate staging key"
+    key_dest="$(op_ref staging) — store the same shared key minted during prod setup"
   fi
 
   echo "Setting up the ${ENV_TARGET} magic link." >&2
@@ -163,10 +171,14 @@ Generated ${ENV_TARGET} values — NOT stored anywhere. Copy them in yourself:
   .magic_link_api_key  -> ${key_dest}
 
 Next:
+  - Enable for review: run the "Deploy ${ENV_TARGET}" workflow with
+      reviewer_account_refresh_enabled = true (seeds SSM from the secret above,
+      serves /api/magic, and starts the scheduled magic-keepalive Lambda).
   - Verify once stored + deployed:
       MAGIC_LINK_API_KEY=${key} scripts/setup-magic-link.sh --verify --env ${ENV_TARGET}
-  - Seed the first refresh:  gh workflow run refresh-magic-link.yml
-  - After approval, revoke:  scripts/setup-magic-link.sh --teardown
+  - After approval, disable: re-run the deploy with the flag off (tears down the
+      SSM blob, 404s /api/magic, stops the schedule), then:
+      scripts/setup-magic-link.sh --teardown
 ============================================================================
 
 EOF
@@ -227,22 +239,22 @@ teardown() {
     echo "  skipped token revoke (no client id / token)." >&2
   fi
 
-  # The live route reads MAGIC_LINK_BLOB / MAGIC_LINK_API_KEY from the Lambda env at
-  # runtime, so clearing the stored secrets alone leaves the URL working until the next
-  # deploy. Strip them from the running Lambda now (merging into the existing variables
-  # so the rest survives) for an immediate 404. Mirrors refresh-magic-link.sh.
+  # The canonical token blob now lives in SSM; the full disable is to re-deploy with
+  # reviewer_account_refresh_enabled=false (tears down the SSM param + schedule). For
+  # an immediate 404 without waiting on a deploy, clear MAGIC_LINK_API_KEY from the
+  # live proxy env — handleMagic 404s when the gate key is empty.
   local lambda="${LAMBDA_FUNCTION_NAME:-}"
   if [[ -n "${lambda}" ]] && command -v aws >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-    if confirm "  Clear MAGIC_LINK_* from the live ${lambda} env now (immediate 404)?"; then
+    if confirm "  Clear MAGIC_LINK_API_KEY from the live ${lambda} env now (immediate 404)?"; then
       local current_env env_payload
       current_env=$(aws lambda get-function-configuration \
         --function-name "${lambda}" --query 'Environment.Variables' --output json)
       [[ -n "${current_env}" && "${current_env}" != "null" ]] || current_env='{}'
       env_payload=$(jq -nc --argjson current "${current_env}" \
-        '{Variables: ($current | del(.MAGIC_LINK_BLOB, .MAGIC_LINK_API_KEY))}')
+        '{Variables: ($current | del(.MAGIC_LINK_API_KEY))}')
       aws lambda update-function-configuration \
         --function-name "${lambda}" --environment "${env_payload}" >/dev/null
-      echo "  cleared MAGIC_LINK_BLOB / MAGIC_LINK_API_KEY on ${lambda}; route now 404s." >&2
+      echo "  cleared MAGIC_LINK_API_KEY on ${lambda}; route now 404s." >&2
     fi
   else
     echo "  set LAMBDA_FUNCTION_NAME (with aws + jq installed) to clear the live env automatically." >&2
@@ -253,7 +265,7 @@ teardown() {
 Now finish teardown yourself:
   - Disconnect Foam from the test account: https://www.twitch.tv/settings/connections
   - GitHub    : delete MAGIC_LINK_BLOB_STAGING / MAGIC_LINK_BLOB_PRODUCTION (and MAGIC_LINK_PAT)
-  - 1Password : clear ${OP_REF}
+  - 1Password : clear $(op_ref staging) and $(op_ref prod)
 Clear the stored secrets too, or the next deploy re-populates the Lambda env and revives the route.
 EOF
 }
