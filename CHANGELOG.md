@@ -16,6 +16,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Add magic link support (#50)
 
+- **(api)** Ssm based keepalive (#51)
+
 
 ### Miscellaneous
 
@@ -66,6 +68,8 @@ All notable changes to this project will be documented in this file.
 - **(docs)** Get rid of ai generated readme
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 
 ### Refactor
