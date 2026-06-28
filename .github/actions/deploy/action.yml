@@ -44,13 +44,16 @@ runs:
       shell: bash
       working-directory: terraform
       # Bootstrap-only: create the state lock table on a fresh environment. Skip it
-      # once the table is in state — a targeted apply refuses to run whenever the
-      # config has a pending state move (e.g. adding count to a resource), which
-      # would otherwise break every deploy that touches addressing. The unconstrained
-      # plan/apply below handles those moves correctly.
+      # once the table exists — a targeted apply refuses to run whenever the config
+      # has a pending state move (e.g. adding count to a resource), which would
+      # otherwise break every deploy that touches addressing. The unconstrained
+      # plan/apply below handles those moves correctly. Checked via the AWS CLI
+      # rather than `terraform state list` because the setup-terraform wrapper
+      # swallows piped stdout. Table name mirrors aws_dynamodb_table.dynamodb_terraform_lock.
       run: |
-        if terraform state list 2>/dev/null | grep -qx 'aws_dynamodb_table.dynamodb_terraform_lock'; then
-          echo "Lock table already in state; skipping bootstrap apply."
+        lock_table="foam-proxy-${{ inputs.environment }}-terraform-state-lock"
+        if aws dynamodb describe-table --table-name "$lock_table" >/dev/null 2>&1; then
+          echo "Lock table $lock_table already exists; skipping bootstrap apply."
         else
           terraform apply -auto-approve -target=aws_dynamodb_table.dynamodb_terraform_lock
         fi
