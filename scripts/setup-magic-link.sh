@@ -41,9 +41,8 @@ SCOPES=(
   editor:manage:clips
 )
 
-# Gate key location, one item per environment (each holds its own MAGIC_LINK_API_KEY).
-# The key value is still shared across envs — prod setup mints it and you store the
-# same value in both items.
+# Gate key location, one item per env. Each env has its own distinct key — run
+# setup per env and store its minted key; never reuse one value across envs.
 op_ref() {
   case "$1" in
     prod)    echo "op://ci-cd/foam-proxy-production/MAGIC_LINK_API_KEY" ;;
@@ -133,16 +132,15 @@ setup() {
   need twitch; need jq; need shasum
   local base; base="$(base_url "${ENV_TARGET}")" || { echo "error: setup requires --env prod|staging" >&2; exit 1; }
 
+  # Mint a fresh gate key for this env, stored in its own item.
   local key blob_secret key_dest
+  key="$(gen_key)"
   if [[ "${ENV_TARGET}" == "prod" ]]; then
-    key="$(gen_key)"
     blob_secret="MAGIC_LINK_BLOB_PRODUCTION"
-    key_dest="$(op_ref prod) — the shared gate key (store the same value in $(op_ref staging) so both deploys match)"
   else
-    key="${MAGIC_LINK_API_KEY:-}"
     blob_secret="MAGIC_LINK_BLOB_STAGING"
-    key_dest="$(op_ref staging) — store the same shared key minted during prod setup"
   fi
+  key_dest="$(op_ref "${ENV_TARGET}") — this env's gate key (distinct per env)"
 
   echo "Setting up the ${ENV_TARGET} magic link." >&2
   echo "The Twitch account must be a DISPOSABLE, low-privilege TEST account." >&2

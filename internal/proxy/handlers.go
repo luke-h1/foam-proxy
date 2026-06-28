@@ -61,6 +61,11 @@ func (p *ProxyRequests) resolveMagicLink() *config.MagicLink {
 	raw, err := p.magicStore.Get(ctx)
 	if err != nil {
 		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{"error": err.Error()})
+		// Serve last-known-good over the env fallback (unset in prod) so a
+		// transient SSM blip doesn't break review login.
+		if p.magicCache != nil {
+			return p.magicCache
+		}
 		return p.config.MagicLink
 	}
 

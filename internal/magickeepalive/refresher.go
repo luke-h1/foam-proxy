@@ -8,11 +8,16 @@ package magickeepalive
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/foam/proxy/internal/config"
 	"github.com/foam/proxy/internal/proxy/services"
 )
+
+// ErrTokenRotated marks a failure after Twitch rotated the refresh token but
+// before the new blob persisted. The old token is dead, so retrying is futile.
+var ErrTokenRotated = errors.New("token rotated but blob not persisted")
 
 type blobStore interface {
 	Get(ctx context.Context) (string, error)
@@ -50,8 +55,16 @@ func (r *Refresher) Refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("twitch refresh: %w", err)
 	}
+	if resp == nil {
+		return fmt.Errorf("twitch refresh returned no response")
+	}
 	if resp.AccessToken == "" {
 		return fmt.Errorf("twitch refresh returned no access token")
+	}
+	// Empty means Twitch rotated the old token away; carrying it forward would
+	// persist a dead token.
+	if resp.RefreshToken == "" {
+		return fmt.Errorf("twitch refresh returned no refresh token")
 	}
 
 	next := config.MagicLink{
@@ -60,10 +73,7 @@ func (r *Refresher) Refresh(ctx context.Context) error {
 		ExpiresIn:    resp.ExpiresIn,
 		TokenType:    resp.TokenType,
 	}
-	// Keep the prior values when Twitch omits them on the response.
-	if next.RefreshToken == "" {
-		next.RefreshToken = current.RefreshToken
-	}
+	// Token type is constant ("bearer"), not rotating; keep prior if omitted.
 	if next.TokenType == "" {
 		next.TokenType = current.TokenType
 	}
@@ -72,8 +82,10 @@ func (r *Refresher) Refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("marshal blob: %w", err)
 	}
+	// Token already rotated at Twitch; a failed write leaves SSM holding a dead
+	// token. Tag it so the caller doesn't retry.
 	if err := r.store.Put(ctx, string(blob)); err != nil {
-		return fmt.Errorf("write blob: %w", err)
+		return errors.Join(ErrTokenRotated, fmt.Errorf("write blob: %w", err))
 	}
 	return nil
 }

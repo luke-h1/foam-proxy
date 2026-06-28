@@ -52,7 +52,10 @@ resource "aws_iam_role_policy" "lambda_magic_link_read" {
         Action   = ["kms:Decrypt"]
         Resource = "*"
         Condition = {
-          StringEquals = { "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com" }
+          StringEquals = {
+            "kms:ViaService"                      = "ssm.${data.aws_region.current.name}.amazonaws.com"
+            "kms:EncryptionContext:PARAMETER_ARN" = local.magic_link_ssm_arn
+          }
         }
       }
     ]

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -36,6 +37,11 @@ func handle(ctx context.Context) error {
 		log.Printf("magic link keepalive failed: %v", err)
 		sentry.CaptureException(err)
 		sentry.Flush(2 * time.Second)
+		// Token already rotated; retrying re-fails. Surface without returning so
+		// EventBridge doesn't re-invoke. Pre-refresh failures stay retryable.
+		if errors.Is(err, magickeepalive.ErrTokenRotated) {
+			return nil
+		}
 		return err
 	}
 
@@ -65,7 +71,15 @@ func run(ctx context.Context) error {
 }
 
 func enabled() bool {
-	v, _ := strconv.ParseBool(os.Getenv("REVIEWER_ACCOUNT_REFRESH_ENABLED"))
+	raw := os.Getenv("REVIEWER_ACCOUNT_REFRESH_ENABLED")
+	if raw == "" {
+		return false
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("invalid REVIEWER_ACCOUNT_REFRESH_ENABLED %q; treating as disabled: %v", raw, err)
+		return false
+	}
 	return v
 }
 
