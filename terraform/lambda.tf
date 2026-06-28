@@ -7,12 +7,19 @@ locals {
   authorizer_zip = "${local.build_dir}/build/authorizer.zip"
   keepalive_zip  = "${local.build_dir}/build/magic-keepalive.zip"
 
+  # Canonical store for the App Review magic-link token blob. The proxy reads it at
+  # request time and the magic-keepalive Lambda rotates it; seeded from
+  # var.magic_link_blob and otherwise left alone (see aws_ssm_parameter below).
+  # The whole feature is an explicit on/off switch: enabling requires the blob
+  # secret to be seeded too.
   magic_link_enabled   = var.reviewer_account_refresh_enabled
   magic_link_ssm_param = "/${var.project_name}/${var.env}/magic-link-blob"
   magic_link_ssm_arn   = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${local.magic_link_ssm_param}"
-
 }
 
+# SecureString seeded once from var.magic_link_blob (the GitHub secret). value is
+# ignored on subsequent applies so a deploy never reverts a token the keepalive
+# Lambda has rotated. Re-seeding (e.g. after re-minting) needs a manual SSM update.
 resource "aws_ssm_parameter" "magic_link_blob" {
   count = local.magic_link_enabled ? 1 : 0
   name  = local.magic_link_ssm_param
@@ -22,9 +29,17 @@ resource "aws_ssm_parameter" "magic_link_blob" {
 
   lifecycle {
     ignore_changes = [value]
+
+    # SSM rejects an empty SecureString; fail with a clear message instead.
+    precondition {
+      condition     = var.magic_link_blob != ""
+      error_message = "magic_link_blob must be seeded when reviewer_account_refresh_enabled is true."
+    }
   }
 }
 
+# Read-only access to the blob for the shared proxy/authorizer execution role. The
+# authorizer never reads it; the grant is scoped to the single parameter.
 resource "aws_iam_role_policy" "lambda_magic_link_read" {
   count = local.magic_link_enabled ? 1 : 0
   name  = "${var.project_name}-${var.env}-magic-link-ssm-read"
@@ -43,7 +58,10 @@ resource "aws_iam_role_policy" "lambda_magic_link_read" {
         Action   = ["kms:Decrypt"]
         Resource = "*"
         Condition = {
-          StringEquals = { "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com" }
+          StringEquals = {
+            "kms:ViaService"                      = "ssm.${data.aws_region.current.name}.amazonaws.com"
+            "kms:EncryptionContext:PARAMETER_ARN" = local.magic_link_ssm_arn
+          }
         }
       }
     ]

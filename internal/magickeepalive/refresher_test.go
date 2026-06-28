@@ -58,9 +58,22 @@ func TestRefreshRotatesAndPersists(t *testing.T) {
 	}
 }
 
-func TestRefreshKeepsOldRefreshTokenWhenOmitted(t *testing.T) {
+func TestRefreshFailsWhenRefreshTokenOmitted(t *testing.T) {
+	// Empty rotated token means the old one is dead; don't carry it forward.
 	store := &fakeStore{get: `{"access_token":"OLD","refresh_token":"REF","token_type":"bearer"}`}
 	twitch := &fakeTwitch{resp: &services.TwitchRefreshTokenResponse{AccessToken: "NEW"}}
+
+	if err := New(store, twitch).Refresh(context.Background()); err == nil {
+		t.Fatal("expected error when Twitch omits the rotated refresh token")
+	}
+	if store.puts != 0 {
+		t.Fatalf("Put called %d times, want 0 when no rotated token returned", store.puts)
+	}
+}
+
+func TestRefreshCarriesTokenTypeWhenOmitted(t *testing.T) {
+	store := &fakeStore{get: `{"access_token":"OLD","refresh_token":"REF","token_type":"bearer"}`}
+	twitch := &fakeTwitch{resp: &services.TwitchRefreshTokenResponse{AccessToken: "NEW", RefreshToken: "NEWREF"}}
 
 	if err := New(store, twitch).Refresh(context.Background()); err != nil {
 		t.Fatalf("Refresh() error = %v", err)
@@ -70,11 +83,39 @@ func TestRefreshKeepsOldRefreshTokenWhenOmitted(t *testing.T) {
 	if err := json.Unmarshal([]byte(store.put), &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if got.RefreshToken != "REF" {
-		t.Fatalf("refresh_token = %q, want carried-over REF", got.RefreshToken)
+	if got.RefreshToken != "NEWREF" {
+		t.Fatalf("refresh_token = %q, want rotated NEWREF", got.RefreshToken)
 	}
 	if got.TokenType != "bearer" {
 		t.Fatalf("token_type = %q, want carried-over bearer", got.TokenType)
+	}
+}
+
+func TestRefreshTagsErrorWhenPersistFailsAfterRotation(t *testing.T) {
+	store := &fakeStore{
+		get:    `{"access_token":"OLD","refresh_token":"REF","token_type":"bearer"}`,
+		putErr: errors.New("ssm down"),
+	}
+	twitch := &fakeTwitch{resp: &services.TwitchRefreshTokenResponse{AccessToken: "NEW", RefreshToken: "NEWREF"}}
+
+	err := New(store, twitch).Refresh(context.Background())
+	if err == nil {
+		t.Fatal("expected error when persisting the rotated blob fails")
+	}
+	if !errors.Is(err, ErrTokenRotated) {
+		t.Fatalf("error = %v, want it to wrap ErrTokenRotated", err)
+	}
+}
+
+func TestRefreshFailsOnNilResponse(t *testing.T) {
+	store := &fakeStore{get: `{"access_token":"OLD","refresh_token":"REF"}`}
+	twitch := &fakeTwitch{} // resp and err both nil
+
+	if err := New(store, twitch).Refresh(context.Background()); err == nil {
+		t.Fatal("expected error when Twitch returns a nil response")
+	}
+	if store.puts != 0 {
+		t.Fatalf("Put called %d times, want 0 on nil response", store.puts)
 	}
 }
 

@@ -1,3 +1,11 @@
+# App Review magic-link keepalive: a Lambda on an EventBridge schedule that swaps
+# the stored Twitch refresh token for a fresh access token and writes it back to
+# the SSM blob the proxy reads. Replaces the refresh-magic-link GitHub workflow.
+#
+# Gated by var.reviewer_account_refresh_enabled: when off, the schedule is DISABLED
+# (the Lambda never fires, SSM is never touched) and the Lambda's own env guard is
+# false. Flip it on for App Review windows via the deploy workflow's input.
+
 resource "aws_iam_role" "keepalive_exec" {
   name = "${var.project_name}-${var.env}-keepalive-exec-role"
   assume_role_policy = jsonencode({
@@ -15,9 +23,12 @@ resource "aws_iam_role_policy_attachment" "keepalive_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+# Read + write the blob parameter via the SSM-scoped KMS key. Only created while
+# enabled, so the role has no SSM/KMS write access when keepalive is off.
 resource "aws_iam_role_policy" "keepalive_ssm" {
-  name = "${var.project_name}-${var.env}-keepalive-ssm"
-  role = aws_iam_role.keepalive_exec.id
+  count = local.magic_link_enabled ? 1 : 0
+  name  = "${var.project_name}-${var.env}-keepalive-ssm"
+  role  = aws_iam_role.keepalive_exec.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -32,7 +43,10 @@ resource "aws_iam_role_policy" "keepalive_ssm" {
         Action   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"]
         Resource = "*"
         Condition = {
-          StringEquals = { "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com" }
+          StringEquals = {
+            "kms:ViaService"                      = "ssm.${data.aws_region.current.name}.amazonaws.com"
+            "kms:EncryptionContext:PARAMETER_ARN" = local.magic_link_ssm_arn
+          }
         }
       }
     ]
@@ -91,6 +105,13 @@ resource "aws_cloudwatch_event_target" "magic_keepalive" {
   rule      = aws_cloudwatch_event_rule.magic_keepalive.name
   target_id = "magic-keepalive"
   arn       = aws_lambda_function.magic_keepalive.arn
+
+  # Don't let a scheduled invoke land before the Lambda can log or reach SSM.
+  depends_on = [
+    aws_lambda_permission.magic_keepalive_events,
+    aws_cloudwatch_log_group.magic_keepalive_logs,
+    aws_iam_role_policy.keepalive_ssm,
+  ]
 }
 
 resource "aws_lambda_permission" "magic_keepalive_events" {

@@ -97,9 +97,8 @@ variable "magic_link_api_key" {
   sensitive   = true
 }
 
-
 variable "reviewer_account_refresh_enabled" {
   type        = bool
-  description = "on/off switch for the App Review magic link + token keepalive. When true the blob is stored in SSM, the proxy serves /api/magic, and the scheduled magic-keepalive Lambda refreshes the token; enabling also requires magic_link_blob to be seeded. When false the SSM blob is torn down, /api/magic 404s, and the keepalive schedule is disabled — so nothing runs and SSM is never touched while app-store reviewers aren't looking."
+  description = "Master on/off switch for the App Review magic link + token keepalive. When true the blob is stored in SSM, the proxy serves /api/magic, and the scheduled magic-keepalive Lambda refreshes the token; enabling also requires magic_link_blob to be seeded. When false the SSM blob is torn down, /api/magic 404s, and the keepalive schedule is disabled — so nothing runs and SSM is never touched while reviewers aren't looking."
   default     = false
 }

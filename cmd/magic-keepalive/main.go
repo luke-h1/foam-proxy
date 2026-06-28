@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -23,16 +24,22 @@ func main() {
 	lambda.Start(handle)
 }
 
-// handle runs on event-bridge schedule. no-op unless `REVIEWER_ACCOUNT_REFRESH_ENABLED` is enabled
-// so the token is only kept fresh during app-store review windows
+// handle runs on an EventBridge schedule. It is a no-op unless
+// REVIEWER_ACCOUNT_REFRESH_ENABLED is true, so the token is only kept warm (and
+// SSM only touched) during App Review windows.
 func handle(ctx context.Context) error {
 	if !enabled() {
-		log.Print("REVIEWER_ACCOUNT_REFRESH_ENABLED is disabled; skipping refresh")
+		log.Print("REVIEWER_ACCOUNT_REFRESH_ENABLED is off; skipping refresh")
 		return nil
 	}
 
 	if err := run(ctx); err != nil {
 		log.Printf("magic link keepalive failed: %v", err)
+		// Already rotated: expected, non-retryable. Return nil so EventBridge
+		// doesn't re-invoke, and skip Sentry. Pre-refresh failures stay retryable.
+		if errors.Is(err, magickeepalive.ErrTokenRotated) {
+			return nil
+		}
 		sentry.CaptureException(err)
 		sentry.Flush(2 * time.Second)
 		return err
@@ -50,7 +57,6 @@ func run(ctx context.Context) error {
 
 	clientID := os.Getenv("TWITCH_CLIENT_ID")
 	clientSecret := os.Getenv("TWITCH_CLIENT_SECRET")
-
 	if clientID == "" || clientSecret == "" {
 		return fmt.Errorf("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are required")
 	}
@@ -62,11 +68,18 @@ func run(ctx context.Context) error {
 
 	twitch := services.NewTwitchService(clientID, clientSecret, twitchTimeout)
 	return magickeepalive.New(store, twitch).Refresh(ctx)
-
 }
 
 func enabled() bool {
-	v, _ := strconv.ParseBool(os.Getenv("REVIEWER_ACCOUNT_REFRESH_ENABLED"))
+	raw := os.Getenv("REVIEWER_ACCOUNT_REFRESH_ENABLED")
+	if raw == "" {
+		return false
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("invalid REVIEWER_ACCOUNT_REFRESH_ENABLED %q; treating as disabled: %v", raw, err)
+		return false
+	}
 	return v
 }
 
@@ -75,7 +88,6 @@ func initSentry() {
 	if dsn == "" {
 		return
 	}
-
 	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
 		log.Printf("sentry init: %v", err)
 	}

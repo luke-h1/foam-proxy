@@ -9,6 +9,12 @@ KEEPALIVE := $(BUILD)/magic-keepalive
 
 .PHONY: all clean build proxy authorizer keepalive zips changelog version
 
+# Rebuild a bootstrap when its sources change, not just when it's missing.
+COMMON_SRCS    := $(shell find ./internal -name '*.go') go.mod go.sum
+PROXY_SRCS     := $(shell find ./cmd/proxy -name '*.go') $(COMMON_SRCS)
+AUTH_SRCS      := $(shell find ./cmd/authorizer -name '*.go') $(COMMON_SRCS)
+KEEPALIVE_SRCS := $(shell find ./cmd/magic-keepalive -name '*.go') $(COMMON_SRCS)
+
 all: zips
 
 zips: $(BUILD)/proxy.zip $(BUILD)/authorizer.zip $(BUILD)/magic-keepalive.zip
@@ -22,15 +28,15 @@ $(BUILD)/authorizer.zip: $(AUTH)/bootstrap
 $(BUILD)/magic-keepalive.zip: $(KEEPALIVE)/bootstrap
 	cd $(KEEPALIVE) && zip -q ../magic-keepalive.zip bootstrap
 
-$(PROXY)/bootstrap:
+$(PROXY)/bootstrap: $(PROXY_SRCS)
 	mkdir -p $(PROXY)
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w" -o $(PROXY)/bootstrap ./cmd/proxy
 
-$(AUTH)/bootstrap:
+$(AUTH)/bootstrap: $(AUTH_SRCS)
 	mkdir -p $(AUTH)
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w" -o $(AUTH)/bootstrap ./cmd/authorizer
 
-$(KEEPALIVE)/bootstrap:
+$(KEEPALIVE)/bootstrap: $(KEEPALIVE_SRCS)
 	mkdir -p $(KEEPALIVE)
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w" -o $(KEEPALIVE)/bootstrap ./cmd/magic-keepalive
 

@@ -18,20 +18,21 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-type magicLinkGetter interface {
+// magicLinkSource reads the raw token blob JSON from the canonical store (SSM).
+type magicLinkSource interface {
 	Get(ctx context.Context) (string, error)
 }
 
-// how often /api/magic re-reads SSM within one warm Lambda
-// instance.
+// magicCacheTTL bounds how often /api/magic re-reads SSM within one warm Lambda
+// instance. The magic-keepalive Lambda rotates the blob every few hours, so a
 // short TTL keeps reviewers on a fresh token without hammering SSM.
-
 const magicCacheTTL = 60 * time.Second
 
 type ProxyRequests struct {
 	config     *config.Proxy
 	twitch     *services.TwitchService
-	magicStore magicLinkGetter
+	magicStore magicLinkSource
+
 	magicMu    sync.Mutex
 	magicCache *config.MagicLink
 	magicExp   time.Time
@@ -41,34 +42,44 @@ func NewProxyRequests(cfg *config.Proxy, twitch *services.TwitchService) *ProxyR
 	return &ProxyRequests{config: cfg, twitch: twitch}
 }
 
+// resolveMagicLink returns the current token blob, reading SSM (cached) when a
+// store is configured and otherwise falling back to the env-var blob. A transient
+// SSM error also falls back to the env blob rather than breaking the review login.
 func (p *ProxyRequests) resolveMagicLink() *config.MagicLink {
 	if p.magicStore == nil {
 		return p.config.MagicLink
 	}
 
 	p.magicMu.Lock()
-
 	defer p.magicMu.Unlock()
-
 	if !p.magicExp.IsZero() && time.Now().Before(p.magicExp) {
 		return p.magicCache
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-
 	raw, err := p.magicStore.Get(ctx)
-
 	if err != nil {
-		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{
-			"error": err.Error(),
-		})
+		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{"error": err.Error()})
+		// Serve last-known-good over the env fallback (unset in prod) so a
+		// transient SSM blip doesn't break review login.
+		if p.magicCache != nil {
+			return p.magicCache
+		}
 		return p.config.MagicLink
 	}
+
 	parsed := config.ParseMagicLink(raw)
 	if parsed == nil {
+		// Malformed/empty blob: don't poison the cache or extend the TTL; keep
+		// last-known-good (or env fallback) and re-read next call.
+		safeLog("[AUTHDBG] magic link SSM parse failed", map[string]string{})
+		if p.magicCache != nil {
+			return p.magicCache
+		}
 		return p.config.MagicLink
 	}
+
 	p.magicCache = parsed
 	p.magicExp = time.Now().Add(magicCacheTTL)
 	return p.magicCache
