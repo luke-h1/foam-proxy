@@ -1,7 +1,62 @@
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 locals {
   build_dir      = "${path.module}/.."
   proxy_zip      = "${local.build_dir}/build/proxy.zip"
   authorizer_zip = "${local.build_dir}/build/authorizer.zip"
+  keepalive_zip  = "${local.build_dir}/build/magic-keepalive.zip"
+
+  # Canonical store for the App Review magic-link token blob. The proxy reads it at
+  # request time and the magic-keepalive Lambda rotates it; seeded from
+  # var.magic_link_blob and otherwise left alone (see aws_ssm_parameter below).
+  # The whole feature is an explicit on/off switch: enabling requires the blob
+  # secret to be seeded too.
+  magic_link_enabled   = var.reviewer_account_refresh_enabled
+  magic_link_ssm_param = "/${var.project_name}/${var.env}/magic-link-blob"
+  magic_link_ssm_arn   = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${local.magic_link_ssm_param}"
+}
+
+# SecureString seeded once from var.magic_link_blob (the GitHub secret). value is
+# ignored on subsequent applies so a deploy never reverts a token the keepalive
+# Lambda has rotated. Re-seeding (e.g. after re-minting) needs a manual SSM update.
+resource "aws_ssm_parameter" "magic_link_blob" {
+  count = local.magic_link_enabled ? 1 : 0
+  name  = local.magic_link_ssm_param
+  type  = "SecureString"
+  value = var.magic_link_blob
+  tags  = var.tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# Read-only access to the blob for the shared proxy/authorizer execution role. The
+# authorizer never reads it; the grant is scoped to the single parameter.
+resource "aws_iam_role_policy" "lambda_magic_link_read" {
+  count = local.magic_link_enabled ? 1 : 0
+  name  = "${var.project_name}-${var.env}-magic-link-ssm-read"
+  role  = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = local.magic_link_ssm_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com" }
+        }
+      }
+    ]
+  })
 }
 
 resource "aws_iam_role" "lambda_exec" {
@@ -46,7 +101,7 @@ resource "aws_lambda_function" "lambda" {
       PROXY_DSN            = var.proxy_dsn
       SENTRY_ENVIRONMENT   = var.env
       SENTRY_RELEASE       = var.git_sha
-      MAGIC_LINK_BLOB      = var.magic_link_blob
+      MAGIC_LINK_SSM_PARAM = local.magic_link_enabled ? local.magic_link_ssm_param : ""
       MAGIC_LINK_API_KEY   = var.magic_link_api_key
     }
   }

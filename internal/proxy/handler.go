@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
+	"github.com/foam/proxy/internal/magiclink"
 	"github.com/foam/proxy/internal/proxy/services"
 	"github.com/getsentry/sentry-go"
 )
@@ -62,6 +63,18 @@ func NewHandler() (*Handler, error) {
 
 	twitchService := services.NewTwitchService(cfg.TwitchClientID, cfg.TwitchClientSecret, cfg.TwitchTimeout)
 	proxyRequests := NewProxyRequests(cfg, twitchService)
+
+	// Read the canonical magic-link blob from SSM at request time. Without a param
+	// (local/dev) the handler falls back to the MAGIC_LINK_BLOB env var.
+	if cfg.MagicLinkSSMParam != "" {
+		store, storeErr := magiclink.NewStore(context.Background(), cfg.MagicLinkSSMParam)
+		if storeErr != nil {
+			log.Printf("magic link SSM store init failed, falling back to env blob: %v", storeErr)
+		} else {
+			proxyRequests.magicStore = store
+		}
+	}
+
 	return &Handler{proxyRequests: proxyRequests}, nil
 }
 

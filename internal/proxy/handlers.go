@@ -9,6 +9,8 @@ import (
 	"html"
 	"net/url"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
@@ -16,13 +18,55 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
+// magicLinkSource reads the raw token blob JSON from the canonical store (SSM).
+type magicLinkSource interface {
+	Get(ctx context.Context) (string, error)
+}
+
+// magicCacheTTL bounds how often /api/magic re-reads SSM within one warm Lambda
+// instance. The magic-keepalive Lambda rotates the blob every few hours, so a
+// short TTL keeps reviewers on a fresh token without hammering SSM.
+const magicCacheTTL = 60 * time.Second
+
 type ProxyRequests struct {
-	config *config.Proxy
-	twitch *services.TwitchService
+	config     *config.Proxy
+	twitch     *services.TwitchService
+	magicStore magicLinkSource
+
+	magicMu    sync.Mutex
+	magicCache *config.MagicLink
+	magicExp   time.Time
 }
 
 func NewProxyRequests(cfg *config.Proxy, twitch *services.TwitchService) *ProxyRequests {
 	return &ProxyRequests{config: cfg, twitch: twitch}
+}
+
+// resolveMagicLink returns the current token blob, reading SSM (cached) when a
+// store is configured and otherwise falling back to the env-var blob. A transient
+// SSM error also falls back to the env blob rather than breaking the review login.
+func (p *ProxyRequests) resolveMagicLink() *config.MagicLink {
+	if p.magicStore == nil {
+		return p.config.MagicLink
+	}
+
+	p.magicMu.Lock()
+	defer p.magicMu.Unlock()
+	if !p.magicExp.IsZero() && time.Now().Before(p.magicExp) {
+		return p.magicCache
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	raw, err := p.magicStore.Get(ctx)
+	if err != nil {
+		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{"error": err.Error()})
+		return p.config.MagicLink
+	}
+
+	p.magicCache = config.ParseMagicLink(raw)
+	p.magicExp = time.Now().Add(magicCacheTTL)
+	return p.magicCache
 }
 
 func (p *ProxyRequests) Handle(req *events.APIGatewayProxyRequest) Response {
@@ -125,7 +169,7 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 	var magic *config.MagicLink
 	expectedKey := ""
 	if p.config != nil {
-		magic = p.config.MagicLink
+		magic = p.resolveMagicLink()
 		expectedKey = p.config.MagicLinkAPIKey
 	}
 

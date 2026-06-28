@@ -48,8 +48,14 @@ type Proxy struct {
 	DeployedBy         string
 	DeployedAt         string
 	GitSHA             string
-	MagicLink          *MagicLink
-	MagicLinkAPIKey    string
+	// MagicLink is the env-var fallback blob (MAGIC_LINK_BLOB), used for local/dev
+	// and tests. In deployed environments the canonical blob lives in SSM and is
+	// read at request time via MagicLinkSSMParam.
+	MagicLink       *MagicLink
+	MagicLinkAPIKey string
+	// MagicLinkSSMParam is the SSM parameter name holding the canonical token blob.
+	// Empty falls back to MagicLink (the env var).
+	MagicLinkSSMParam string
 }
 
 func LoadEnv() (*Proxy, error) {
@@ -67,12 +73,15 @@ func LoadEnv() (*Proxy, error) {
 		DeployedBy:         os.Getenv("DEPLOYED_BY"),
 		DeployedAt:         os.Getenv("DEPLOYED_AT"),
 		GitSHA:             os.Getenv("GIT_SHA"),
-		MagicLink:          parseMagicLink(os.Getenv("MAGIC_LINK_BLOB")),
+		MagicLink:          ParseMagicLink(os.Getenv("MAGIC_LINK_BLOB")),
 		MagicLinkAPIKey:    os.Getenv("MAGIC_LINK_API_KEY"),
+		MagicLinkSSMParam:  os.Getenv("MAGIC_LINK_SSM_PARAM"),
 	}, nil
 }
 
-func parseMagicLink(raw string) *MagicLink {
+// ParseMagicLink decodes a token blob JSON, returning nil for empty/invalid input
+// or when the required tokens are missing (which disables the magic link).
+func ParseMagicLink(raw string) *MagicLink {
 	if raw == "" {
 		return nil
 	}
