@@ -35,13 +35,13 @@ func handle(ctx context.Context) error {
 
 	if err := run(ctx); err != nil {
 		log.Printf("magic link keepalive failed: %v", err)
-		sentry.CaptureException(err)
-		sentry.Flush(2 * time.Second)
-		// Token already rotated; retrying re-fails. Surface without returning so
-		// EventBridge doesn't re-invoke. Pre-refresh failures stay retryable.
+		// Already rotated: expected, non-retryable. Return nil so EventBridge
+		// doesn't re-invoke, and skip Sentry. Pre-refresh failures stay retryable.
 		if errors.Is(err, magickeepalive.ErrTokenRotated) {
 			return nil
 		}
+		sentry.CaptureException(err)
+		sentry.Flush(2 * time.Second)
 		return err
 	}
 

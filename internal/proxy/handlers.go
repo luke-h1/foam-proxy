@@ -69,7 +69,18 @@ func (p *ProxyRequests) resolveMagicLink() *config.MagicLink {
 		return p.config.MagicLink
 	}
 
-	p.magicCache = config.ParseMagicLink(raw)
+	parsed := config.ParseMagicLink(raw)
+	if parsed == nil {
+		// Malformed/empty blob: don't poison the cache or extend the TTL; keep
+		// last-known-good (or env fallback) and re-read next call.
+		safeLog("[AUTHDBG] magic link SSM parse failed", map[string]string{})
+		if p.magicCache != nil {
+			return p.magicCache
+		}
+		return p.config.MagicLink
+	}
+
+	p.magicCache = parsed
 	p.magicExp = time.Now().Add(magicCacheTTL)
 	return p.magicCache
 }

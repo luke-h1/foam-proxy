@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -69,7 +70,12 @@ func NewHandler() (*Handler, error) {
 	if cfg.MagicLinkSSMParam != "" {
 		store, storeErr := magiclink.NewStore(context.Background(), cfg.MagicLinkSSMParam)
 		if storeErr != nil {
-			log.Printf("magic link SSM store init failed, falling back to env blob: %v", storeErr)
+			// No env fallback (prod): a nil store silently 404s /api/magic, so
+			// fail fast rather than look like "feature disabled".
+			if cfg.MagicLink == nil {
+				return nil, fmt.Errorf("magic link SSM store init failed: %w", storeErr)
+			}
+			log.Printf("magic link SSM store init failed, using env blob fallback: %v", storeErr)
 		} else {
 			proxyRequests.magicStore = store
 		}

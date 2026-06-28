@@ -88,12 +88,12 @@ func ParseMagicLink(raw string) *MagicLink {
 
 	var magic MagicLink
 	if err := json.Unmarshal([]byte(raw), &magic); err != nil {
-		log.Printf("failed to parse MAGIC_LINK_BLOB: %v", err)
+		log.Printf("failed to parse magic link blob: %v", err)
 		return nil
 	}
 
 	if magic.AccessToken == "" || magic.RefreshToken == "" {
-		log.Print("MAGIC_LINK_BLOB missing tokens; magic link disabled")
+		log.Print("magic link blob missing tokens; magic link disabled")
 		return nil
 	}
 

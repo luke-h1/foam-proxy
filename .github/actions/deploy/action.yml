@@ -52,10 +52,14 @@ runs:
       # swallows piped stdout. Table name mirrors aws_dynamodb_table.dynamodb_terraform_lock.
       run: |
         lock_table="foam-proxy-${{ inputs.environment }}-terraform-state-lock"
-        if aws dynamodb describe-table --table-name "$lock_table" >/dev/null 2>&1; then
+        if err="$(aws dynamodb describe-table --table-name "$lock_table" 2>&1 >/dev/null)"; then
           echo "Lock table $lock_table already exists; skipping bootstrap apply."
-        else
+        elif grep -q "ResourceNotFoundException" <<<"$err"; then
           terraform apply -auto-approve -target=aws_dynamodb_table.dynamodb_terraform_lock
+        else
+          # Real AWS error (IAM, throttling) — not a missing table. Fail loudly.
+          echo "$err" >&2
+          exit 1
         fi
 
     - name: Terraform fmt -check

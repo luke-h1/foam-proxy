@@ -29,6 +29,12 @@ resource "aws_ssm_parameter" "magic_link_blob" {
 
   lifecycle {
     ignore_changes = [value]
+
+    # SSM rejects an empty SecureString; fail with a clear message instead.
+    precondition {
+      condition     = var.magic_link_blob != ""
+      error_message = "magic_link_blob must be seeded when reviewer_account_refresh_enabled is true."
+    }
   }
 }
 
