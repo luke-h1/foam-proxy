@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 
 - **(proxy)** Implicit code redirect
 
+- **(api)** Magic link marshal (#52)
+
 
 ### Features
 
@@ -74,6 +76,8 @@ All notable changes to this project will be documented in this file.
 - Update changelog [skip ci]
 
 - **(docs)** Update readme on keep-alive
+
+- Update changelog [skip ci]
 
 
 ### Refactor
