@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       reviewer_account_refresh_enabled:
-        description: "Enable the App Review magic link + token keepalive (turn on during review, off otherwise)"
+        description: "Enable the App Review magic link + token keepalive (defaults on; set false to disable the live route)"
         type: boolean
-        default: false
+        default: true
   push:
     branches:
       - main
@@ -19,7 +19,11 @@ permissions:
 
 env:
   TF_VAR_env: production
-  TF_VAR_reviewer_account_refresh_enabled: ${{ inputs.reviewer_account_refresh_enabled || false }}
+  # Magic link stays enabled across automatic main deploys. push events carry no
+  # inputs, so the old `inputs.* || false` reset the flag to false on every merge,
+  # tore down the SSM blob, and 404d /api/magic. Pushes default ON; a manual
+  # workflow_dispatch still honors the toggle (set it false to disable the route).
+  TF_VAR_reviewer_account_refresh_enabled: ${{ inputs.reviewer_account_refresh_enabled || github.event_name != 'workflow_dispatch' }}
   TF_VAR_api_key: ${{ secrets.STAGING_API_KEY }}
   TF_VAR_zone_id: ${{ secrets.ZONE_ID }}
   TF_VAR_root_domain: foam-app.com
