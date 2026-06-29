@@ -68,6 +68,7 @@ type TwitchRefreshTokenResponse struct {
 type TwitchService struct {
 	clientID     string
 	clientSecret string
+	baseURL      string
 	httpClient   *http.Client
 }
 
@@ -75,7 +76,8 @@ func NewTwitchService(clientID, clientSecret string, timeout time.Duration) *Twi
 	return &TwitchService{
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		httpClient:   &http.Client{Timeout: http.DefaultClient.Timeout},
+		baseURL:      twitchIdUrl,
+		httpClient:   &http.Client{Timeout: timeout},
 	}
 }
 
@@ -99,7 +101,7 @@ func (s *TwitchService) DefaultToken() (*TwitchTokenResponse, error) {
 	form.Set("grant_type", "client_credentials")
 	body := form.Encode()
 
-	req, err := http.NewRequest(http.MethodPost, twitchIdUrl, bytes.NewBufferString(body))
+	req, err := http.NewRequest(http.MethodPost, s.baseURL, bytes.NewBufferString(body))
 	if err != nil {
 		recordTokenMetric("error", "request_build", -1)
 		captureTwitchError("token", err, "request_build", -1, 0, "")
@@ -162,12 +164,14 @@ func (s *TwitchService) RefreshToken(token string) (*TwitchRefreshTokenResponse,
 
 	body := form.Encode()
 
-	req, err := http.NewRequest(http.MethodPost, twitchIdUrl, bytes.NewBufferString(body))
+	req, err := http.NewRequest(http.MethodPost, s.baseURL, bytes.NewBufferString(body))
 	if err != nil {
 		recordRefreshTokenMetric("error", "request_build", -1)
 		captureTwitchError("refresh_token", err, "request_build", -1, 0, "")
 		return nil, err
 	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	start := time.Now()
 	resp, err := s.httpClient.Do(req)
