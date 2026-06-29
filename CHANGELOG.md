@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 
 - **(infrastructure)** No teardown on push
 
+- **(api)** Resolve invalid refresh token sentry err
+
 
 ### Features
 
@@ -88,6 +90,8 @@ All notable changes to this project will be documented in this file.
 - **(release)** 0.3.0 [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 - **(release)** 0.3.0 [skip ci]
 
