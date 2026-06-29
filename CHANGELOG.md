@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Magic link marshal (#52)
 
+- **(infrastructure)** No teardown on push
+
 
 ### Features
 
@@ -80,6 +82,8 @@ All notable changes to this project will be documented in this file.
 - Update changelog [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 - **(release)** 0.3.0 [skip ci]
 
