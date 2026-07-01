@@ -1,0 +1,7 @@
+{
+  "path": "/api/version",
+  "requestContext": {
+    "httpMethod": "GET",
+    "requestId": "local-version"
+  }
+}

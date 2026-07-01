@@ -1,0 +1,11 @@
+{
+  "path": "/api/magic",
+  "queryStringParameters": {
+    "key": "replace-with-MAGIC_LINK_API_KEY",
+    "format": "json"
+  },
+  "requestContext": {
+    "httpMethod": "GET",
+    "requestId": "local-magic"
+  }
+}
