@@ -109,6 +109,8 @@ All notable changes to this project will be documented in this file.
 
 - **(docs)** Add bsd-3 license
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
