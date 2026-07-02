@@ -1,0 +1,10 @@
+{
+  "path": "/api/refresh-token",
+  "queryStringParameters": {
+    "token": "replace-with-a-real-refresh-token"
+  },
+  "requestContext": {
+    "httpMethod": "GET",
+    "requestId": "local-refresh-token"
+  }
+}

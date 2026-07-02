@@ -9,6 +9,33 @@ Lambda which supports authentication proxying for [foam](https://github.com/luke
 - [git-cliff](https://github.com/orhun/git-cliff) for changelog and version bumps
 
 
+## Run locally
+
+The Lambdas are standard `aws-lambda-go` handlers, run locally under the AWS Lambda
+Runtime Interface Emulator (needs Docker).
+
+```bash
+cp .env.local.example .env.local   # fill in TWITCH_CLIENT_ID/SECRET etc.
+make run-local                     # starts the proxy on :9000 (leave running)
+```
+
+In another shell, POST an event fixture from `events/`:
+
+```bash
+make invoke-local                              # defaults to events/proxy-healthcheck.json
+make invoke-local EVENT=events/proxy-version.json
+```
+
+Run a different Lambda with `CMD` (both targets):
+
+```bash
+make CMD=authorizer run-local
+make CMD=authorizer invoke-local EVENT=events/authorizer.json
+```
+
+For pure logic changes the tests are the faster loop:
+`TWITCH_CLIENT_ID=x TWITCH_CLIENT_SECRET=y go test ./...`
+
 ## Changelog & version
 
 Changelog is generated from conventional commits. On push to `main`, the **Changelog** workflow updates `CHANGELOG.md` and commits it.
