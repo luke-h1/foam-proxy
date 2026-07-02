@@ -105,6 +105,10 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Add local lambda for dx (#53)
 
+- Update changelog [skip ci]
+
+- **(docs)** Add bsd-3 license
+
 
 ### Refactor
 
