@@ -8,6 +8,7 @@ package magiclink
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/foam/proxy/internal/config"
 )
@@ -71,6 +73,21 @@ func (s *Store) Put(ctx context.Context, value string) error {
 	return err
 }
 
+// permanentSSMErrors are hard failures retrying can never fix.
+var permanentSSMErrors = map[string]bool{
+	"AccessDeniedException": true,
+	"ParameterNotFound":     true,
+	"ValidationException":   true,
+}
+
+func isRetryable(err error) bool {
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		return !permanentSSMErrors[apiErr.ErrorCode()]
+	}
+	return true
+}
+
 func withRetry[T any](ctx context.Context, fn func() (T, error)) (T, error) {
 	var (
 		result T
@@ -81,7 +98,7 @@ func withRetry[T any](ctx context.Context, fn func() (T, error)) (T, error) {
 		if err == nil {
 			return result, nil
 		}
-		if attempt == retryAttempts {
+		if !isRetryable(err) || attempt == retryAttempts {
 			break
 		}
 		select {

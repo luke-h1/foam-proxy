@@ -128,10 +128,8 @@ func (p *ProxyRequests) handleRefreshToken(req *events.APIGatewayProxyRequest) R
 }
 
 func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response {
-	var magic *config.MagicLink
 	expectedKey := ""
 	if p.config != nil {
-		magic = p.magicCache.Resolve()
 		expectedKey = p.config.MagicLinkAPIKey
 	}
 
@@ -142,13 +140,19 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 		format = req.QueryStringParameters["format"]
 	}
 
-	if magic == nil || expectedKey == "" || key == "" {
+	if expectedKey == "" || key == "" {
 		return p.jsonResponse(404, map[string]string{"error": "not found"})
 	}
 
 	providedKey := sha256.Sum256([]byte(key))
 	expected := sha256.Sum256([]byte(expectedKey))
 	if subtle.ConstantTimeCompare(providedKey[:], expected[:]) != 1 {
+		return p.jsonResponse(404, map[string]string{"error": "not found"})
+	}
+
+	// only authenticated requests pay for the SSM-backed cache read
+	magic := p.magicCache.Resolve()
+	if magic == nil {
 		return p.jsonResponse(404, map[string]string{"error": "not found"})
 	}
 

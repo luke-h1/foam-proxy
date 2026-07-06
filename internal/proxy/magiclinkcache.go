@@ -13,7 +13,12 @@ type magicLinkSource interface {
 	Get(ctx context.Context) (string, error)
 }
 
-const magicCacheTTL = 60 * time.Second
+const (
+	magicCacheTTL = 60 * time.Second
+	// magicCacheErrorTTL is the negative-cache window after a failed SSM
+	// read/parse, so a sustained outage doesn't hit SSM on every request.
+	magicCacheErrorTTL = 5 * time.Second
+)
 
 type magicLinkCache struct {
 	source  magicLinkSource
@@ -39,7 +44,11 @@ func (c *magicLinkCache) Resolve() *config.MagicLink {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.exp.IsZero() && time.Now().Before(c.exp) {
-		return c.cached
+		if c.cached != nil {
+			return c.cached
+		}
+		// inside a negative-cache window with nothing fetched yet
+		return c.envLink
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -47,6 +56,7 @@ func (c *magicLinkCache) Resolve() *config.MagicLink {
 	raw, err := c.source.Get(ctx)
 	if err != nil {
 		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{"error": err.Error()})
+		c.exp = time.Now().Add(magicCacheErrorTTL)
 		if c.cached != nil {
 			return c.cached
 		}
@@ -56,6 +66,7 @@ func (c *magicLinkCache) Resolve() *config.MagicLink {
 	parsed := config.ParseMagicLink(raw)
 	if parsed == nil {
 		safeLog("[AUTHDBG] magic link SSM parse failed", map[string]string{})
+		c.exp = time.Now().Add(magicCacheErrorTTL)
 		if c.cached != nil {
 			return c.cached
 		}

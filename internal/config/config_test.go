@@ -1,6 +1,20 @@
 package config
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/getsentry/sentry-go"
+)
+
+func TestInitSentryNoOpWithEmptyDSN(t *testing.T) {
+	t.Setenv("TEST_SENTRY_DSN", "")
+
+	InitSentry("TEST_SENTRY_DSN")
+
+	if sentry.CurrentHub().Client() != nil {
+		t.Fatal("InitSentry with empty DSN should not initialise a Sentry client")
+	}
+}
 
 func TestResolveAppScheme(t *testing.T) {
 	tests := []struct {

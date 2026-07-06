@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/aws/smithy-go"
 )
 
 type fakeSSMClient struct {
@@ -79,6 +81,44 @@ func TestStoreGetRetriesExhausted(t *testing.T) {
 	}
 	if client.getCalls != retryAttempts {
 		t.Fatalf("getCalls = %d, want %d", client.getCalls, retryAttempts)
+	}
+}
+
+func TestStoreGetReturnsCtxErrWhenCancelledDuringBackoff(t *testing.T) {
+	client := &fakeSSMClient{
+		getErrs: []error{errors.New("transient"), errors.New("transient"), errors.New("transient")},
+	}
+	store := &Store{client: client, param: "/foo"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	_, err := store.Get(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Get() error = %v, want context.Canceled", err)
+	}
+	if client.getCalls != 1 {
+		t.Fatalf("getCalls = %d, want 1 (no retry after cancellation)", client.getCalls)
+	}
+	if elapsed := time.Since(start); elapsed >= retryBaseWait {
+		t.Fatalf("Get() took %v, want prompt return without backoff", elapsed)
+	}
+}
+
+func TestStoreGetFailsFastOnPermanentError(t *testing.T) {
+	permanent := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "denied"}
+	client := &fakeSSMClient{
+		getErrs: []error{permanent, permanent, permanent},
+	}
+	store := &Store{client: client, param: "/foo"}
+
+	_, err := store.Get(context.Background())
+	if err == nil {
+		t.Fatal("Get() error = nil, want permanent error")
+	}
+	if client.getCalls != 1 {
+		t.Fatalf("getCalls = %d, want 1 (permanent errors should not retry)", client.getCalls)
 	}
 }
 

@@ -25,6 +25,7 @@ func DefaultHeaders() map[string]string {
 func (p *ProxyRequests) jsonResponse(statusCode int, body interface{}) Response {
 	raw, err := json.Marshal(body)
 	if err != nil {
+		statusCode = 500
 		raw = []byte(`{"error":"internal server error"}`)
 	}
 	return Response{

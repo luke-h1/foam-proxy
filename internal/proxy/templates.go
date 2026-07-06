@@ -7,6 +7,10 @@ import (
 )
 
 func redirectPage(title, targetPrefix string) string {
+	safeTitle := html.EscapeString(title)
+	hrefAttr := html.EscapeString(targetPrefix)
+	jsTarget, _ := json.Marshal(targetPrefix)
+
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -32,7 +36,7 @@ func redirectPage(title, targetPrefix string) string {
       }
 
       const query = params.toString();
-      const redirectUrl = query ? '%s?' + query : '%s';
+      const redirectUrl = query ? %s + '?' + query : %s;
       const openFoam = document.getElementById('open-foam');
 
       if (openFoam) {
@@ -45,10 +49,11 @@ func redirectPage(title, targetPrefix string) string {
       }, 150);
     </script>
   </body>
-</html>`, title, targetPrefix, targetPrefix, targetPrefix)
+</html>`, safeTitle, hrefAttr, string(jsTarget), string(jsTarget))
 }
 
 func redirectTargetPage(title, target string) string {
+	safeTitle := html.EscapeString(title)
 	hrefAttr := html.EscapeString(target)
 	jsTarget, _ := json.Marshal(target)
 
@@ -80,5 +85,5 @@ func redirectTargetPage(title, target string) string {
       }, 150);
     </script>
   </body>
-</html>`, title, hrefAttr, string(jsTarget))
+</html>`, safeTitle, hrefAttr, string(jsTarget))
 }
