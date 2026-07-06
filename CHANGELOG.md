@@ -117,6 +117,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Tidy up internal (#54)
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
