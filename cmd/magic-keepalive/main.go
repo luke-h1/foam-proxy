@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -12,15 +11,11 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/foam/proxy/internal/config"
 	"github.com/foam/proxy/internal/magickeepalive"
-	"github.com/foam/proxy/internal/magiclink"
-	"github.com/foam/proxy/internal/proxy/services"
 	"github.com/getsentry/sentry-go"
 )
 
-const twitchTimeout = 20 * time.Second
-
 func main() {
-	initSentry()
+	config.InitSentry("REFRESH_DSN")
 	lambda.Start(handle)
 }
 
@@ -50,24 +45,11 @@ func handle(ctx context.Context) error {
 }
 
 func run(ctx context.Context) error {
-	param := os.Getenv("MAGIC_LINK_SSM_PARAM")
-	if param == "" {
-		return fmt.Errorf("MAGIC_LINK_SSM_PARAM is required")
-	}
-
-	clientID := os.Getenv("TWITCH_CLIENT_ID")
-	clientSecret := os.Getenv("TWITCH_CLIENT_SECRET")
-	if clientID == "" || clientSecret == "" {
-		return fmt.Errorf("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are required")
-	}
-
-	store, err := magiclink.NewStore(ctx, param)
+	refresher, err := magickeepalive.NewFromEnv(ctx, os.Getenv)
 	if err != nil {
-		return fmt.Errorf("init ssm store: %w", err)
+		return err
 	}
-
-	twitch := services.NewTwitchService(clientID, clientSecret, twitchTimeout)
-	return magickeepalive.New(store, twitch).Refresh(ctx)
+	return refresher.Refresh(ctx)
 }
 
 func enabled() bool {
@@ -81,14 +63,4 @@ func enabled() bool {
 		return false
 	}
 	return v
-}
-
-func initSentry() {
-	dsn := os.Getenv("REFRESH_DSN")
-	if dsn == "" {
-		return
-	}
-	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
-		log.Printf("sentry init: %v", err)
-	}
 }

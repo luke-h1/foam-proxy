@@ -8,21 +8,32 @@ package magiclink
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
+
+	"github.com/foam/proxy/internal/config"
 )
 
-// Store reads and writes the raw blob JSON for a single SSM parameter.
+const (
+	retryAttempts = 3
+	retryBaseWait = 200 * time.Millisecond
+)
+
+type ssmClient interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+}
+
 type Store struct {
-	client *ssm.Client
+	client ssmClient
 	param  string
 }
 
-// NewStore resolves AWS config from the ambient environment (region + role on
-// Lambda) and binds the store to the given parameter name.
 func NewStore(ctx context.Context, param string) (*Store, error) {
 	cfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -31,11 +42,12 @@ func NewStore(ctx context.Context, param string) (*Store, error) {
 	return &Store{client: ssm.NewFromConfig(cfg), param: param}, nil
 }
 
-// Get returns the decrypted blob JSON.
 func (s *Store) Get(ctx context.Context) (string, error) {
-	out, err := s.client.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(s.param),
-		WithDecryption: aws.Bool(true),
+	out, err := withRetry(ctx, func() (*ssm.GetParameterOutput, error) {
+		return s.client.GetParameter(ctx, &ssm.GetParameterInput{
+			Name:           aws.String(s.param),
+			WithDecryption: aws.Bool(true),
+		})
 	})
 	if err != nil {
 		return "", err
@@ -43,13 +55,40 @@ func (s *Store) Get(ctx context.Context) (string, error) {
 	return aws.ToString(out.Parameter.Value), nil
 }
 
-// Put overwrites the parameter with a new blob, keeping it a SecureString.
 func (s *Store) Put(ctx context.Context, value string) error {
-	_, err := s.client.PutParameter(ctx, &ssm.PutParameterInput{
-		Name:      aws.String(s.param),
-		Value:     aws.String(value),
-		Type:      types.ParameterTypeSecureString,
-		Overwrite: aws.Bool(true),
+	if config.ParseMagicLink(value) == nil {
+		return fmt.Errorf("magiclink: refusing to store malformed blob")
+	}
+
+	_, err := withRetry(ctx, func() (*ssm.PutParameterOutput, error) {
+		return s.client.PutParameter(ctx, &ssm.PutParameterInput{
+			Name:      aws.String(s.param),
+			Value:     aws.String(value),
+			Type:      types.ParameterTypeSecureString,
+			Overwrite: aws.Bool(true),
+		})
 	})
 	return err
+}
+
+func withRetry[T any](ctx context.Context, fn func() (T, error)) (T, error) {
+	var (
+		result T
+		err    error
+	)
+	for attempt := 1; attempt <= retryAttempts; attempt++ {
+		result, err = fn()
+		if err == nil {
+			return result, nil
+		}
+		if attempt == retryAttempts {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return result, ctx.Err()
+		case <-time.After(retryBaseWait * time.Duration(attempt)):
+		}
+	}
+	return result, err
 }
