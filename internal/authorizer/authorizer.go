@@ -135,11 +135,5 @@ func constantTimeEquals(a, b string) bool {
 }
 
 func InitSentry() {
-	dsn := os.Getenv("AUTH_DSN")
-	if dsn == "" {
-		return
-	}
-	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
-		log.Printf("sentry init: %v", err)
-	}
+	config.InitSentry("AUTH_DSN")
 }

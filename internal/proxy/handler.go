@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"os"
 	"sort"
 	"time"
 
@@ -20,6 +19,8 @@ import (
 type Handler struct {
 	proxyRequests *ProxyRequests
 }
+
+const sentryFlushTimeout = 250 * time.Millisecond
 
 func redactValue(value string) string {
 	if value == "" {
@@ -77,7 +78,7 @@ func NewHandler() (*Handler, error) {
 			}
 			log.Printf("magic link SSM store init failed, using env blob fallback: %v", storeErr)
 		} else {
-			proxyRequests.magicStore = store
+			proxyRequests.setMagicStore(store)
 		}
 	}
 
@@ -85,7 +86,7 @@ func NewHandler() (*Handler, error) {
 }
 
 func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
-	defer sentry.Flush(2 * time.Second)
+	defer sentry.Flush(sentryFlushTimeout)
 
 	if input == nil {
 		return apiResponse(500, DefaultHeaders(), map[string]string{"error": "invalid request"}), nil
@@ -124,7 +125,10 @@ func bodyPreview(body string) string {
 	return body[:240] + "…"
 }
 
-func mustJSON(value interface{}) string {
+func mustJSON(value map[string]string) string {
+	if len(value) == 0 {
+		return `{}`
+	}
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return `{}`
@@ -169,11 +173,5 @@ func buildRequestURL(req *events.APIGatewayProxyRequest) string {
 }
 
 func InitSentry() {
-	dsn := os.Getenv("PROXY_DSN")
-	if dsn == "" {
-		return
-	}
-	if err := sentry.Init(config.SentryOptions(dsn)); err != nil {
-		log.Printf("sentry init: %v", err)
-	}
+	config.InitSentry("PROXY_DSN")
 }

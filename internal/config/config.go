@@ -100,6 +100,16 @@ func ParseMagicLink(raw string) *MagicLink {
 	return &magic
 }
 
+func InitSentry(dsnEnvVar string) {
+	dsn := os.Getenv(dsnEnvVar)
+	if dsn == "" {
+		return
+	}
+	if err := sentry.Init(SentryOptions(dsn)); err != nil {
+		log.Printf("sentry init: %v", err)
+	}
+}
+
 func SentryOptions(dsn string) sentry.ClientOptions {
 	return sentry.ClientOptions{
 		Dsn:              dsn,
