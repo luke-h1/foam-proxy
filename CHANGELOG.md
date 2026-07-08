@@ -123,6 +123,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Move sentry org (#55)
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
