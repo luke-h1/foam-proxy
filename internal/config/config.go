@@ -114,13 +114,36 @@ func SentryOptions(dsn string) sentry.ClientOptions {
 	return sentry.ClientOptions{
 		Dsn:              dsn,
 		Environment:      os.Getenv("SENTRY_ENVIRONMENT"),
-		Release:          os.Getenv("SENTRY_RELEASE"),
+		Release:          sentryRelease(),
 		AttachStacktrace: true,
 		SampleRate:       1.0,
 		EnableTracing:    true,
-		TracesSampleRate: 0.5,
+		TracesSampleRate: 1,
 		MaxBreadcrumbs:   50,
 		SendDefaultPII:   false,
 		Debug:            false,
+		EnableLogs:       true,
+		Tags:             sentryDefaultTags(),
 	}
+}
+
+func sentryRelease() string {
+	if release := os.Getenv("SENTRY_RELEASE"); release != "" {
+		return release
+	}
+	return os.Getenv("GIT_SHA")
+}
+
+func sentryDefaultTags() map[string]string {
+	tags := map[string]string{}
+	for key, env := range map[string]string{
+		"git_sha":     "GIT_SHA",
+		"deployed_by": "DEPLOYED_BY",
+		"deployed_at": "DEPLOYED_AT",
+	} {
+		if v := os.Getenv(env); v != "" {
+			tags[key] = v
+		}
+	}
+	return tags
 }

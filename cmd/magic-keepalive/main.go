@@ -19,6 +19,28 @@ func main() {
 	lambda.Start(handle)
 }
 
+const monitorSlug = "magic-link-keepalive"
+
+func keepaliveMonitor() *sentry.MonitorConfig {
+	return &sentry.MonitorConfig{
+		Schedule:              sentry.IntervalSchedule(3, sentry.MonitorScheduleUnitHour),
+		MaxRuntime:            5,
+		CheckInMargin:         10,
+		FailureIssueThreshold: 1,
+	}
+}
+
+func finishCheckIn(id *sentry.EventID, monitor *sentry.MonitorConfig, status sentry.CheckInStatus) {
+	if id == nil {
+		return
+	}
+	sentry.CaptureCheckIn(&sentry.CheckIn{
+		ID:          *id,
+		MonitorSlug: monitorSlug,
+		Status:      status,
+	}, monitor)
+}
+
 // handle runs on an EventBridge schedule. It is a no-op unless
 // REVIEWER_ACCOUNT_REFRESH_ENABLED is true, so the token is only kept warm (and
 // SSM only touched) during App Review windows.
@@ -28,18 +50,32 @@ func handle(ctx context.Context) error {
 		return nil
 	}
 
+	monitor := keepaliveMonitor()
+	checkInID := sentry.CaptureCheckIn(&sentry.CheckIn{
+		MonitorSlug: monitorSlug,
+		Status:      sentry.CheckInStatusInProgress,
+	}, monitor)
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetContext("monitor", sentry.Context{"slug": monitorSlug})
+	})
+
 	if err := run(ctx); err != nil {
 		log.Printf("magic link keepalive failed: %v", err)
-		// Already rotated: expected, non-retryable. Return nil so EventBridge
-		// doesn't re-invoke, and skip Sentry. Pre-refresh failures stay retryable.
+		// Already rotated: expected, non-retryable. Close the check-in OK and return
+		// nil so EventBridge doesn't re-invoke. Pre-refresh failures stay retryable.
 		if errors.Is(err, magickeepalive.ErrTokenRotated) {
+			finishCheckIn(checkInID, monitor, sentry.CheckInStatusOK)
+			sentry.Flush(2 * time.Second)
 			return nil
 		}
+		finishCheckIn(checkInID, monitor, sentry.CheckInStatusError)
 		sentry.CaptureException(err)
 		sentry.Flush(2 * time.Second)
 		return err
 	}
 
+	finishCheckIn(checkInID, monitor, sentry.CheckInStatusOK)
+	sentry.Flush(2 * time.Second)
 	log.Print("refreshed magic link keepalive token")
 	return nil
 }
