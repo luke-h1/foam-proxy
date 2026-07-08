@@ -120,7 +120,7 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 			Category: "request",
 			Message:  method + " " + input.Path,
 			Level:    sentry.LevelInfo,
-			Data:     map[string]interface{}{"request_id": requestID},
+			Data:     map[string]any{"request_id": requestID},
 		}, 0)
 	})
 
@@ -140,7 +140,7 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 	tx.Status = spanStatusForHTTP(response.StatusCode)
 	statusAttr := sentry.WithAttributes(attribute.Int("http.status_code", response.StatusCode))
 	meter.Count("proxy.response", 1, statusAttr)
-	meter.Distribution("proxy.request.duration_ms", float64(elapsed.Milliseconds()), sentry.WithUnit("millisecond"), statusAttr)
+	meter.Distribution("proxy.request.duration_ms", float64(elapsed.Milliseconds()), sentry.WithUnit(sentry.UnitMillisecond), statusAttr)
 
 	return &events.APIGatewayProxyResponse{
 		StatusCode: response.StatusCode,
@@ -186,7 +186,7 @@ func mustJSON(value map[string]string) string {
 	return string(raw)
 }
 
-func apiResponse(status int, headers map[string]string, body interface{}) *events.APIGatewayProxyResponse {
+func apiResponse(status int, headers map[string]string, body any) *events.APIGatewayProxyResponse {
 	raw, err := json.Marshal(body)
 	if err != nil {
 		raw = []byte(`{"error":"internal server error"}`)

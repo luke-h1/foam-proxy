@@ -61,10 +61,12 @@ func handle(ctx context.Context) error {
 
 	if err := run(ctx); err != nil {
 		log.Printf("magic link keepalive failed: %v", err)
-		// Already rotated: expected, non-retryable. Close the check-in OK and return
-		// nil so EventBridge doesn't re-invoke. Pre-refresh failures stay retryable.
+		// Already rotated: the token is dead, so retrying is futile. Close the
+		// check-in as error to surface the dead-token state, but return nil so
+		// EventBridge doesn't re-invoke. Pre-refresh failures stay retryable.
 		if errors.Is(err, magickeepalive.ErrTokenRotated) {
-			finishCheckIn(checkInID, monitor, sentry.CheckInStatusOK)
+			finishCheckIn(checkInID, monitor, sentry.CheckInStatusError)
+			sentry.CaptureException(err)
 			sentry.Flush(2 * time.Second)
 			return nil
 		}
