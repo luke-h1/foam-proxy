@@ -14,6 +14,7 @@ import (
 	"github.com/foam/proxy/internal/magiclink"
 	"github.com/foam/proxy/internal/proxy/services"
 	"github.com/getsentry/sentry-go"
+	"github.com/getsentry/sentry-go/attribute"
 )
 
 type Handler struct {
@@ -107,15 +108,64 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 	sentry.ConfigureScope(func(scope *sentry.Scope) {
 		scope.SetTag("request_id", requestID)
 		scope.SetTag("path", input.Path)
+		scope.SetTag("http.method", method)
+		scope.SetContext("request", sentry.Context{
+			"id":     requestID,
+			"url":    requestURL,
+			"method": method,
+			"path":   input.Path,
+			"query":  sanitizeQuery(input.QueryStringParameters),
+		})
+		scope.AddBreadcrumb(&sentry.Breadcrumb{
+			Category: "request",
+			Message:  method + " " + input.Path,
+			Level:    sentry.LevelInfo,
+			Data:     map[string]any{"request_id": requestID},
+		}, 0)
 	})
+
+	meter := sentry.NewMeter(tx.Context())
+	meter.SetAttributes(
+		attribute.String("http.method", method),
+		attribute.String("http.route", input.Path),
+	)
+	meter.Count("proxy.request", 1)
+
+	start := time.Now()
 	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q,"method":%q,"query":%s,"query_keys":%q}`, requestID, input.Path, requestURL, method, mustJSON(sanitizeQuery(input.QueryStringParameters)), sortedKeys(input.QueryStringParameters))
 	response := handler.proxyRequests.Handle(input)
+	elapsed := time.Since(start)
 	log.Printf(`{"level":"info","msg":"response","request_id":%q,"path":%q,"status":%d,"content_type":%q,"location":%q,"body_preview":%q}`, requestID, input.Path, response.StatusCode, response.Headers["Content-Type"], response.Headers["Location"], bodyPreview(response.Body))
+
+	tx.Status = spanStatusForHTTP(response.StatusCode)
+	statusAttr := sentry.WithAttributes(attribute.Int("http.status_code", response.StatusCode))
+	meter.Count("proxy.response", 1, statusAttr)
+	meter.Distribution("proxy.request.duration_ms", float64(elapsed.Milliseconds()), sentry.WithUnit(sentry.UnitMillisecond), statusAttr)
+
 	return &events.APIGatewayProxyResponse{
 		StatusCode: response.StatusCode,
 		Headers:    response.Headers,
 		Body:       response.Body,
 	}, nil
+}
+
+func spanStatusForHTTP(status int) sentry.SpanStatus {
+	switch {
+	case status >= 200 && status < 400:
+		return sentry.SpanStatusOK
+	case status == 401:
+		return sentry.SpanStatusUnauthenticated
+	case status == 403:
+		return sentry.SpanStatusPermissionDenied
+	case status == 404:
+		return sentry.SpanStatusNotFound
+	case status == 429:
+		return sentry.SpanStatusResourceExhausted
+	case status >= 400 && status < 500:
+		return sentry.SpanStatusInvalidArgument
+	default:
+		return sentry.SpanStatusInternalError
+	}
 }
 
 func bodyPreview(body string) string {
@@ -136,7 +186,7 @@ func mustJSON(value map[string]string) string {
 	return string(raw)
 }
 
-func apiResponse(status int, headers map[string]string, body interface{}) *events.APIGatewayProxyResponse {
+func apiResponse(status int, headers map[string]string, body any) *events.APIGatewayProxyResponse {
 	raw, err := json.Marshal(body)
 	if err != nil {
 		raw = []byte(`{"error":"internal server error"}`)

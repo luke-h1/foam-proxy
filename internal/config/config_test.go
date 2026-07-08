@@ -16,6 +16,45 @@ func TestInitSentryNoOpWithEmptyDSN(t *testing.T) {
 	}
 }
 
+func TestSentryReleasePrefersEnvThenGitSHA(t *testing.T) {
+	t.Run("SENTRY_RELEASE wins", func(t *testing.T) {
+		t.Setenv("SENTRY_RELEASE", "v1.2.3")
+		t.Setenv("GIT_SHA", "abc123")
+		if got := sentryRelease(); got != "v1.2.3" {
+			t.Fatalf("sentryRelease() = %q, want v1.2.3", got)
+		}
+	})
+	t.Run("falls back to GIT_SHA", func(t *testing.T) {
+		t.Setenv("SENTRY_RELEASE", "")
+		t.Setenv("GIT_SHA", "abc123")
+		if got := sentryRelease(); got != "abc123" {
+			t.Fatalf("sentryRelease() = %q, want abc123", got)
+		}
+	})
+}
+
+func TestSentryOptionsCarriesReleaseTagsAndMetrics(t *testing.T) {
+	t.Setenv("SENTRY_RELEASE", "")
+	t.Setenv("GIT_SHA", "deadbeef")
+	t.Setenv("DEPLOYED_BY", "ci")
+	t.Setenv("DEPLOYED_AT", "")
+
+	opts := SentryOptions("https://example@sentry.io/1")
+
+	if opts.Release != "deadbeef" {
+		t.Fatalf("Release = %q, want deadbeef (source context needs a commit-linked release)", opts.Release)
+	}
+	if opts.DisableMetrics {
+		t.Fatal("DisableMetrics should be false so the Meter API emits APM metrics")
+	}
+	if opts.Tags["git_sha"] != "deadbeef" || opts.Tags["deployed_by"] != "ci" {
+		t.Fatalf("default tags = %v, want git_sha/deployed_by populated", opts.Tags)
+	}
+	if _, ok := opts.Tags["deployed_at"]; ok {
+		t.Fatalf("empty env vars should be omitted from tags, got %v", opts.Tags)
+	}
+}
+
 func TestResolveAppScheme(t *testing.T) {
 	tests := []struct {
 		name      string
