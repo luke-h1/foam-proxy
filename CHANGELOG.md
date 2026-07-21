@@ -18,6 +18,11 @@ All notable changes to this project will be documented in this file.
 - **(api)** Resolve invalid refresh token sentry err
 
 
+### Build
+
+- Pull sentry DSNs from 1password (#56)
+
+
 ### Features
 
 - **(api)** Add magic link support (#50)
@@ -124,6 +129,8 @@ All notable changes to this project will be documented in this file.
 - **(api)** Move sentry org (#55)
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 
 ### Refactor
