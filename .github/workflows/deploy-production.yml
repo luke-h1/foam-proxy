@@ -32,8 +32,6 @@ env:
   TF_VAR_certificate_chain: ${{ secrets.CERTIFICATE_CHAIN }}
   TF_VAR_deployed_by: ${{ github.actor }}
   TF_VAR_git_sha: ${{ github.sha }}
-  TF_VAR_authorizer_dsn: ${{ secrets.SENTRY_AUTHORIZER_DSN }}
-  TF_VAR_proxy_dsn: ${{ secrets.SENTRY_PROXY_DSN }}
   TF_VAR_magic_link_blob: ${{ secrets.MAGIC_LINK_BLOB_PRODUCTION }}
 
 jobs:
@@ -58,12 +56,16 @@ jobs:
           TWITCH_CLIENT_ID: op://ci-cd/foam-proxy-production/TWITCH_CLIENT_ID
           TWITCH_CLIENT_SECRET: op://ci-cd/foam-proxy-production/TWITCH_CLIENT_SECRET
           TF_VAR_magic_link_api_key: op://ci-cd/foam-proxy-production/MAGIC_LINK_API_KEY
+          PROXY_DSN: op://ci-cd/foam-proxy-production/SENTRY_PROXY_DSN
+          AUTHORIZER_DSN: op://ci-cd/foam-proxy-production/SENTRY_AUTH_DSN
           OP_ENV_FILE: ".env"
 
       - name: Set Terraform variables
         run: |
           echo "TF_VAR_twitch_client_id=$TWITCH_CLIENT_ID" >> $GITHUB_ENV
           echo "TF_VAR_twitch_client_secret=$TWITCH_CLIENT_SECRET" >> $GITHUB_ENV
+          echo "TF_VAR_proxy_dsn=$PROXY_DSN" >> $GITHUB_ENV
+          echo "TF_VAR_authorizer_dsn=$AUTHORIZER_DSN" >> $GITHUB_ENV
 
       - name: Install
         uses: ./.github/actions/install
