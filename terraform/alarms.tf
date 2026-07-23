@@ -17,9 +17,25 @@ locals {
   }
 }
 
+check "alarm_destinations_configured" {
+  assert {
+    condition     = local.notifications_enabled
+    error_message = "Alarm notifications require discord_webhook_url or both telegram_bot_token and telegram_chat_id."
+  }
+}
+
 resource "aws_sns_topic" "lambda_alarms" {
   count = local.notifications_enabled ? 1 : 0
   name  = "${var.project_name}-lambda-alarms-${var.env}"
+  tags = merge(var.tags, {
+    Environment = var.env
+  })
+}
+
+resource "aws_sqs_queue" "alarm_notifier_dlq" {
+  count                     = local.notifications_enabled ? 1 : 0
+  name                      = "${var.project_name}-alarm-notifier-dlq-${var.env}"
+  message_retention_seconds = 1209600 # 14 days
   tags = merge(var.tags, {
     Environment = var.env
   })
@@ -44,6 +60,21 @@ resource "aws_iam_role_policy_attachment" "alarm_notifier_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy" "alarm_notifier_dlq" {
+  count = local.notifications_enabled ? 1 : 0
+  name  = "${var.project_name}-${var.env}-alarm-notifier-dlq"
+  role  = aws_iam_role.alarm_notifier_exec[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["sqs:SendMessage"]
+      Resource = [aws_sqs_queue.alarm_notifier_dlq[0].arn]
+    }]
+  })
+}
+
 resource "aws_lambda_function" "alarm_notifier" {
   count            = local.notifications_enabled ? 1 : 0
   function_name    = "${var.project_name}-alarm-notifier-${var.env}"
@@ -52,10 +83,14 @@ resource "aws_lambda_function" "alarm_notifier" {
   role             = aws_iam_role.alarm_notifier_exec[0].arn
   filename         = local.notifier_zip
   source_code_hash = filebase64sha256(local.notifier_zip)
-  timeout          = 15
+  timeout          = 30
   memory_size      = 128
   architectures    = ["arm64"]
   description      = "Foam proxy CloudWatch alarm notifier ${var.env}"
+
+  dead_letter_config {
+    target_arn = aws_sqs_queue.alarm_notifier_dlq[0].arn
+  }
 
   environment {
     variables = {
@@ -72,6 +107,11 @@ resource "aws_lambda_function" "alarm_notifier" {
     Environment = var.env
   })
 
+  depends_on = [
+    aws_iam_role_policy.alarm_notifier_dlq,
+    aws_iam_role_policy_attachment.alarm_notifier_basic,
+  ]
+
   lifecycle {
     precondition {
       condition     = (var.telegram_bot_token == "") == (var.telegram_chat_id == "")
@@ -80,10 +120,23 @@ resource "aws_lambda_function" "alarm_notifier" {
   }
 }
 
+resource "aws_lambda_function_event_invoke_config" "alarm_notifier" {
+  count                        = local.notifications_enabled ? 1 : 0
+  function_name                = aws_lambda_function.alarm_notifier[0].function_name
+  maximum_retry_attempts       = 2
+  maximum_event_age_in_seconds = 3600
+
+  destination_config {
+    on_failure {
+      destination = aws_sqs_queue.alarm_notifier_dlq[0].arn
+    }
+  }
+}
+
 resource "aws_cloudwatch_log_group" "alarm_notifier_logs" {
   count             = local.notifications_enabled ? 1 : 0
   name              = "/aws/lambda/${aws_lambda_function.alarm_notifier[0].function_name}"
-  retention_in_days = 1
+  retention_in_days = 14
   log_group_class   = "STANDARD"
 
   tags = {
@@ -140,6 +193,54 @@ resource "aws_cloudwatch_metric_alarm" "invocations_anomaly" {
         FunctionName = each.value.function_name
       }
     }
+  }
+
+  tags = merge(var.tags, {
+    Environment = var.env
+  })
+}
+
+resource "aws_cloudwatch_metric_alarm" "alarm_notifier_errors" {
+  count               = local.notifications_enabled ? 1 : 0
+  alarm_name          = "${aws_lambda_function.alarm_notifier[0].function_name}-errors"
+  alarm_description   = "Alarm notifier Lambda is failing (${var.env})"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.lambda_alarms[0].arn]
+  ok_actions          = [aws_sns_topic.lambda_alarms[0].arn]
+
+  dimensions = {
+    FunctionName = aws_lambda_function.alarm_notifier[0].function_name
+  }
+
+  tags = merge(var.tags, {
+    Environment = var.env
+  })
+}
+
+resource "aws_cloudwatch_metric_alarm" "alarm_notifier_dlq_depth" {
+  count               = local.notifications_enabled ? 1 : 0
+  alarm_name          = "${aws_sqs_queue.alarm_notifier_dlq[0].name}-depth"
+  alarm_description   = "Alarm notifier DLQ has messages (${var.env})"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.lambda_alarms[0].arn]
+  ok_actions          = [aws_sns_topic.lambda_alarms[0].arn]
+
+  dimensions = {
+    QueueName = aws_sqs_queue.alarm_notifier_dlq[0].name
   }
 
   tags = merge(var.tags, {

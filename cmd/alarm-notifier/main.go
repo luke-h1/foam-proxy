@@ -9,7 +9,6 @@ import (
 
 func main() {
 	cfg, err := alarmnotifier.LoadConfig()
-
 	if err != nil {
 		log.Fatal(err)
 	}

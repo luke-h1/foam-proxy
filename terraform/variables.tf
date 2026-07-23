@@ -106,17 +106,20 @@ variable "reviewer_account_refresh_enabled" {
 variable "discord_webhook_url" {
   type        = string
   description = "The discord webhook URL used for receiving alarm notifications"
+  default     = ""
   sensitive   = true
 }
 
 variable "telegram_bot_token" {
   type        = string
   description = "The telegram bot token"
+  default     = ""
   sensitive   = true
 }
 
 variable "telegram_chat_id" {
   type        = string
   description = "The telegram chat ID which should receive alarm notifications"
+  default     = ""
   sensitive   = true
 }

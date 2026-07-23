@@ -6,13 +6,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
+const (
+	discordContentLimit = 2000
+	discordEmbedLimit   = 4096
+	telegramTextLimit   = 4096
+	httpTimeout         = 5 * time.Second
+)
+
 var (
-	httpClient         = &http.Client{Timeout: 10 * time.Second}
+	httpClient = &http.Client{
+		Timeout: httpTimeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	telegramAPIBaseURL = "https://api.telegram.org"
 )
 
@@ -26,33 +41,70 @@ func NewNotifier(cfg *Config) *Notifier {
 }
 
 func (n *Notifier) Notify(ctx context.Context, alarm *AlarmNotification) error {
-	var errs []string
+	type result struct {
+		name string
+		err  error
+	}
+
+	var (
+		wg      sync.WaitGroup
+		results = make(chan result, 2)
+		sent    atomic.Int32
+	)
 
 	if n.cfg.HasDiscord() {
-		if err := n.sendDiscord(ctx, alarm); err != nil {
-			errs = append(errs, fmt.Sprintf("Discord: %v", err))
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := n.sendDiscord(ctx, alarm); err != nil {
+				results <- result{name: "discord", err: err}
+				return
+			}
+			sent.Add(1)
+		}()
 	}
 
 	if n.cfg.HasTelegram() {
-		if err := n.sendTelegram(ctx, alarm); err != nil {
-			errs = append(errs, fmt.Sprintf("telegram: %v", err))
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := n.sendTelegram(ctx, alarm); err != nil {
+				results <- result{name: "telegram", err: err}
+				return
+			}
+			sent.Add(1)
+		}()
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("Notify failed: %s", strings.Join(errs, "; "))
+	wg.Wait()
+	close(results)
+
+	var errs []string
+	for r := range results {
+		errs = append(errs, fmt.Sprintf("%s: %v", r.name, r.err))
 	}
-	return nil
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	// At least one channel delivered — log the rest but do not fail the invoke,
+	// otherwise SNS/Lambda retries re-send to the channel that already succeeded.
+	if sent.Load() > 0 {
+		log.Printf("partial notify failure: %s", strings.Join(errs, "; "))
+		return nil
+	}
+
+	return fmt.Errorf("notify failed: %s", strings.Join(errs, "; "))
 }
 
 func (n *Notifier) sendDiscord(ctx context.Context, alarm *AlarmNotification) error {
 	payload := map[string]any{
-		"content": fmt.Sprintf("CW alarm **%s** -> `%s`", alarm.AlarmName, alarm.NewStateValue),
+		"content": truncate(fmt.Sprintf("CW alarm **%s** -> `%s`", alarm.AlarmName, alarm.NewStateValue), discordContentLimit),
 		"embeds": []map[string]any{
 			{
-				"title":       fmt.Sprintf("CW: %s", alarm.NewStateValue),
-				"description": FormatPlainText(alarm, n.cfg.Environment),
+				"title":       truncate(fmt.Sprintf("CW: %s", alarm.NewStateValue), 256),
+				"description": truncate(FormatPlainText(alarm, n.cfg.Environment), discordEmbedLimit),
 				"color":       discordColor(alarm.NewStateValue),
 			},
 		},
@@ -78,7 +130,7 @@ func (n *Notifier) sendDiscord(ctx context.Context, alarm *AlarmNotification) er
 func (n *Notifier) sendTelegram(ctx context.Context, alarm *AlarmNotification) error {
 	payload := map[string]any{
 		"chat_id":    n.cfg.TelegramChatID,
-		"text":       FormatHTML(alarm, n.cfg.Environment),
+		"text":       truncate(FormatHTML(alarm, n.cfg.Environment), telegramTextLimit),
 		"parse_mode": "HTML",
 	}
 
@@ -111,4 +163,18 @@ func doJSON(client *http.Client, req *http.Request) error {
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
 	return nil
+}
+
+func truncate(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	if max == 1 {
+		return "…"
+	}
+	return string(r[:max-1]) + "…"
 }

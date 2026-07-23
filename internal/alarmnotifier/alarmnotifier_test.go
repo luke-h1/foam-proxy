@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -77,10 +78,20 @@ func TestFormatHTMLEscapes(t *testing.T) {
 	}
 }
 
+func TestTruncate(t *testing.T) {
+	got := truncate(strings.Repeat("a", 10), 5)
+	if got != "aaaa…" {
+		t.Fatalf("got %q", got)
+	}
+	if truncate("short", 10) != "short" {
+		t.Fatal("should not truncate short strings")
+	}
+}
+
 func TestNotifyPostsBothChannels(t *testing.T) {
-	var discordHits, telegramHits int
+	var discordHits, telegramHits atomic.Int32
 	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		discordHits++
+		discordHits.Add(1)
 		body, _ := io.ReadAll(r.Body)
 		if !strings.Contains(string(body), "ALARM") {
 			t.Errorf("discord body missing ALARM: %s", body)
@@ -90,7 +101,7 @@ func TestNotifyPostsBothChannels(t *testing.T) {
 	defer discord.Close()
 
 	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		telegramHits++
+		telegramHits.Add(1)
 		if !strings.HasSuffix(r.URL.Path, "/bottest-token/sendMessage") {
 			t.Errorf("unexpected telegram path %s", r.URL.Path)
 		}
@@ -118,8 +129,82 @@ func TestNotifyPostsBothChannels(t *testing.T) {
 	if err := n.Notify(context.Background(), alarm); err != nil {
 		t.Fatal(err)
 	}
-	if discordHits != 1 || telegramHits != 1 {
-		t.Fatalf("discord=%d telegram=%d", discordHits, telegramHits)
+	if discordHits.Load() != 1 || telegramHits.Load() != 1 {
+		t.Fatalf("discord=%d telegram=%d", discordHits.Load(), telegramHits.Load())
+	}
+}
+
+func TestNotifyPartialFailureDoesNotError(t *testing.T) {
+	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer discord.Close()
+
+	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("boom"))
+	}))
+	defer telegram.Close()
+
+	prevBase := telegramAPIBaseURL
+	telegramAPIBaseURL = telegram.URL
+	t.Cleanup(func() { telegramAPIBaseURL = prevBase })
+
+	n := NewNotifier(&Config{
+		DiscordWebhookURL: discord.URL,
+		TelegramBotToken:  "test-token",
+		TelegramChatID:    "123",
+	})
+	err := n.Notify(context.Background(), &AlarmNotification{AlarmName: "a", NewStateValue: "ALARM"})
+	if err != nil {
+		t.Fatalf("expected nil when at least one channel succeeds, got %v", err)
+	}
+}
+
+func TestNotifyAllChannelsFail(t *testing.T) {
+	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer discord.Close()
+
+	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer telegram.Close()
+
+	prevBase := telegramAPIBaseURL
+	telegramAPIBaseURL = telegram.URL
+	t.Cleanup(func() { telegramAPIBaseURL = prevBase })
+
+	n := NewNotifier(&Config{
+		DiscordWebhookURL: discord.URL,
+		TelegramBotToken:  "test-token",
+		TelegramChatID:    "123",
+	})
+	if err := n.Notify(context.Background(), &AlarmNotification{AlarmName: "a", NewStateValue: "ALARM"}); err == nil {
+		t.Fatal("expected error when all channels fail")
+	}
+}
+
+func TestDoJSONRejectsRedirect(t *testing.T) {
+	final := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("should not follow redirect")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer final.Close()
+
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, final.URL, http.StatusFound)
+	}))
+	defer redirect.Close()
+
+	req, err := http.NewRequest(http.MethodPost, redirect.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = doJSON(httpClient, req)
+	if err == nil {
+		t.Fatal("expected error on redirect response")
 	}
 }
 
