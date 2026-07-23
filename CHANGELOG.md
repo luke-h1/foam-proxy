@@ -144,6 +144,8 @@ All notable changes to this project will be documented in this file.
 
 - **(release)** 0.3.0 [skip ci]
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
