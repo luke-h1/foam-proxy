@@ -234,3 +234,32 @@ func TestHandleSNS(t *testing.T) {
 		t.Fatalf("expected 1 notify, got %d", hits)
 	}
 }
+
+func TestHandleSNSSkipsNonAlarmStates(t *testing.T) {
+	hits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	n := NewNotifier(&Config{DiscordWebhookURL: srv.URL, Environment: "staging"})
+
+	records := make([]events.SNSEventRecord, 0, 2)
+	for _, state := range []string{"OK", "INSUFFICIENT_DATA"} {
+		msg, _ := json.Marshal(AlarmNotification{
+			AlarmName:     "foam-proxy-lambda-staging-invocations-anomaly",
+			NewStateValue: state,
+		})
+		records = append(records, events.SNSEventRecord{
+			SNS: events.SNSEntity{Message: string(msg)},
+		})
+	}
+
+	if err := n.HandleSNS(context.Background(), events.SNSEvent{Records: records}); err != nil {
+		t.Fatal(err)
+	}
+	if hits != 0 {
+		t.Fatalf("expected no notify for non-alarm states, got %d", hits)
+	}
+}

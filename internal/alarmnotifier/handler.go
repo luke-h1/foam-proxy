@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -25,6 +26,12 @@ func (n *Notifier) HandleSNS(ctx context.Context, event events.SNSEvent) error {
 			continue
 		}
 		log.Printf("alarm received %s -> %s for reason -> %s", alarm.AlarmName, alarm.NewStateValue, alarm.NewStateReason)
+
+		// only notify on abnormal transitions; skip recoveries (OK) and INSUFFICIENT_DATA
+		if !strings.EqualFold(alarm.NewStateValue, "ALARM") {
+			log.Printf("skipping non-alarm state %s for %s", alarm.NewStateValue, alarm.AlarmName)
+			continue
+		}
 
 		if err := n.Notify(ctx, alarm); err != nil {
 			log.Printf("Notification failed for %s: %v", alarm.AlarmName, err)
