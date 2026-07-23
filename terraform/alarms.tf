@@ -32,6 +32,26 @@ resource "aws_sns_topic" "lambda_alarms" {
   })
 }
 
+# allow cloudwatch alarms to publish to the topic
+resource "aws_sns_topic_policy" "lambda_alarms" {
+  count = local.notifications_enabled ? 1 : 0
+  arn   = aws_sns_topic.lambda_alarms[0].arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudwatch.amazonaws.com" }
+      Action    = "SNS:Publish"
+      Resource  = aws_sns_topic.lambda_alarms[0].arn
+      Condition = {
+        ArnLike      = { "aws:SourceArn" = "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:*" }
+        StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id }
+      }
+    }]
+  })
+}
+
 resource "aws_sqs_queue" "alarm_notifier_dlq" {
   count                     = local.notifications_enabled ? 1 : 0
   name                      = "${var.project_name}-alarm-notifier-dlq-${var.env}"
@@ -187,7 +207,7 @@ resource "aws_cloudwatch_metric_alarm" "invocations_anomaly" {
     metric {
       metric_name = "Invocations"
       namespace   = "AWS/Lambda"
-      period      = 150
+      period      = 60
       stat        = "Sum"
       dimensions = {
         FunctionName = each.value.function_name
