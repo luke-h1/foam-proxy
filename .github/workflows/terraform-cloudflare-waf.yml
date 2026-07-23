@@ -28,8 +28,6 @@ defaults:
 jobs:
   plan:
     name: Terraform plan
-    # Fork/Dependabot PRs don't receive Actions secrets, so the AWS + 1Password
-    # steps would fail; restrict the plan to same-repo PRs.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
@@ -80,8 +78,6 @@ jobs:
 
   apply:
     name: Terraform apply
-    # Only ever apply from main. workflow_dispatch lets the runner pick any ref,
-    # so pin the manual path to refs/heads/main too.
     if: >-
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/main'
