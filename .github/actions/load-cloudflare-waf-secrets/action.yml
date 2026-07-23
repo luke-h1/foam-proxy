@@ -10,7 +10,7 @@ runs:
   using: "composite"
   steps:
     - name: Load cloudflare WAF secrets
-      uses: 1password/load-secrets-action@v3
+      uses: 1password/load-secrets-action@dafbe7cb03502b260e2b2893c753c352eee545bf # v3.2.1
       with:
         export-env: true
       env:
