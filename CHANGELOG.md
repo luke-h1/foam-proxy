@@ -29,6 +29,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Ssm based keepalive (#51)
 
+- Cloudflare WAF edge rate limits (#57)
+
 
 ### Miscellaneous
 
@@ -133,6 +135,8 @@ All notable changes to this project will be documented in this file.
 - **(release)** 0.3.0 [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 
 ### Refactor
