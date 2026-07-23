@@ -1,29 +1,22 @@
 name: Cloudflare WAF Terraform
 
-# Zone-level WAF rate limits for the foam-app.com zone (per-IP edge limits on the
-# auth-proxy hosts). PRs get a plan; pushes to main apply. State lives in the
-# foam-production-terraform-state S3 bucket under cloudflare-waf/ - see
-# terraform/cloudflare-waf/README.md.
-
 on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'terraform/cloudflare-waf/**'
-      - '.github/workflows/terraform-cloudflare-waf.yml'
-      - '.github/actions/load-cloudflare-waf-secrets/**'
+      - "terraform/cloudflare-waf/**"
+      - ".github/workflows/terraform-cloudflare-waf.yml"
+      - ".github/actions/load-cloudflare-waf-secrets/**"
   push:
     branches: [main]
     paths:
-      - 'terraform/cloudflare-waf/**'
-      - '.github/workflows/terraform-cloudflare-waf.yml'
-      - '.github/actions/load-cloudflare-waf-secrets/**'
+      - "terraform/cloudflare-waf/**"
+      - ".github/workflows/terraform-cloudflare-waf.yml"
+      - ".github/actions/load-cloudflare-waf-secrets/**"
 
 permissions:
   contents: read
 
-# Plans and applies share one lock so a PR plan can never read state mid-apply
-# and two applies can never race.
 concurrency:
   group: terraform-cloudflare-waf
   cancel-in-progress: false

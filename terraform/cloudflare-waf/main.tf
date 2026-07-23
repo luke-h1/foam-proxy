@@ -1,10 +1,3 @@
-# Per-IP rate limit blocked at the Cloudflare edge, before a request reaches
-# API Gateway/Lambda. Keyed on ip.src + cf.colo.id and scoped to the auth hosts
-# so the rest of the zone is untouched. foam-app.com is on the Free plan, which
-# permits one rate-limit rule with period and mitigation_timeout both fixed at
-# 10s (verified against the live zone), so this is a single broad limit; the
-# managed ddos_l7 ruleset already handles volumetric floods.
-
 resource "cloudflare_ruleset" "rate_limit" {
   zone_id     = var.cloudflare_zone_id
   name        = "foam-proxy rate limit"
