@@ -1,0 +1,19 @@
+name: "Load Cloudflare WAF Secrets"
+description: "Load the Cloudflare WAF terraform credentials from 1Password."
+
+inputs:
+  op_service_account_token:
+    description: "1Password service account token"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Load cloudflare WAF secrets
+      uses: 1password/load-secrets-action@dafbe7cb03502b260e2b2893c753c352eee545bf # v3.2.1
+      with:
+        export-env: true
+      env:
+        OP_SERVICE_ACCOUNT_TOKEN: ${{ inputs.op_service_account_token }}
+        CLOUDFLARE_API_TOKEN: op://ci-cd/foam-proxy-production/CLOUDFLARE_WAF_API_TOKEN
+        TF_VAR_cloudflare_zone_id: op://ci-cd/foam-proxy-production/CLOUDFLARE_ZONE_ID
