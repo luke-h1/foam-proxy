@@ -24,7 +24,6 @@ concurrency:
 defaults:
   run:
     working-directory: terraform/cloudflare-waf
-
 jobs:
   plan:
     name: Terraform plan
