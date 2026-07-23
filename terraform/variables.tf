@@ -102,3 +102,21 @@ variable "reviewer_account_refresh_enabled" {
   description = "Master on/off switch for the App Review magic link + token keepalive. When true the blob is stored in SSM, the proxy serves /api/magic, and the scheduled magic-keepalive Lambda refreshes the token; enabling also requires magic_link_blob to be seeded. When false the SSM blob is torn down, /api/magic 404s, and the keepalive schedule is disabled — so nothing runs and SSM is never touched while reviewers aren't looking."
   default     = false
 }
+
+variable "discord_webhook_url" {
+  type        = string
+  description = "The discord webhook URL used for receiving alarm notifications"
+  sensitive   = true
+}
+
+variable "telegram_bot_token" {
+  type        = string
+  description = "The telegram bot token"
+  sensitive   = true
+}
+
+variable "telegram_chat_id" {
+  type        = string
+  description = "The telegram chat ID which should receive alarm notifications"
+  sensitive   = true
+}

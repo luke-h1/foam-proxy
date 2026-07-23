@@ -1,4 +1,4 @@
-# Output: build/proxy.zip, build/authorizer.zip, build/magic-keepalive.zip
+# Output: build/proxy.zip, build/authorizer.zip, build/magic-keepalive.zip, build/alarm-notifier.zip
 
 GOOS      := linux
 GOARCH    := arm64
@@ -6,8 +6,9 @@ BUILD     := build
 PROXY     := $(BUILD)/proxy
 AUTH      := $(BUILD)/authorizer
 KEEPALIVE := $(BUILD)/magic-keepalive
+NOTIFIER  := $(BUILD)/alarm-notifier
 
-.PHONY: all clean build proxy authorizer keepalive zips changelog version run-local invoke-local
+.PHONY: all clean build proxy authorizer keepalive notifier zips changelog version run-local invoke-local
 
 # Local emulation (AWS Lambda RIE via docker). Build for the host arch so the
 # bootstrap runs natively in the container - no qemu.
@@ -28,10 +29,10 @@ COMMON_SRCS    := $(shell find ./internal -name '*.go') go.mod go.sum
 PROXY_SRCS     := $(shell find ./cmd/proxy -name '*.go') $(COMMON_SRCS)
 AUTH_SRCS      := $(shell find ./cmd/authorizer -name '*.go') $(COMMON_SRCS)
 KEEPALIVE_SRCS := $(shell find ./cmd/magic-keepalive -name '*.go') $(COMMON_SRCS)
-
+NOTIFIER_SRCS  := $(shell find ./cmd/alarm-notifier -name '*.go') $(COMMON_SRCS)
 all: zips
 
-zips: $(BUILD)/proxy.zip $(BUILD)/authorizer.zip $(BUILD)/magic-keepalive.zip
+zips: $(BUILD)/proxy.zip $(BUILD)/authorizer.zip $(BUILD)/magic-keepalive.zip ${BUILD}/alarm-notifier.zip
 
 $(BUILD)/proxy.zip: $(PROXY)/bootstrap
 	cd $(PROXY) && zip -q ../proxy.zip bootstrap
@@ -41,6 +42,9 @@ $(BUILD)/authorizer.zip: $(AUTH)/bootstrap
 
 $(BUILD)/magic-keepalive.zip: $(KEEPALIVE)/bootstrap
 	cd $(KEEPALIVE) && zip -q ../magic-keepalive.zip bootstrap
+
+$(BUILD)/alarm-notifier.zip: $(NOTIFIER)/bootstrap
+	cd $(NOTIFIER) && zip -q ../alarm-notifier.zip bootstrap
 
 $(PROXY)/bootstrap: $(PROXY_SRCS)
 	mkdir -p $(PROXY)
@@ -54,11 +58,15 @@ $(KEEPALIVE)/bootstrap: $(KEEPALIVE_SRCS)
 	mkdir -p $(KEEPALIVE)
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w" -o $(KEEPALIVE)/bootstrap ./cmd/magic-keepalive
 
-build: $(PROXY)/bootstrap $(AUTH)/bootstrap $(KEEPALIVE)/bootstrap
+$(NOTIFIER)/bootstrap: $(NOTIFIER_SRCS)
+	mkdir -p $(NOTIFIER)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w" -o $(NOTIFIER)/bootstrap ./cmd/alarm-notifier
 
+build: $(PROXY)/bootstrap $(AUTH)/bootstrap $(KEEPALIVE)/bootstrap $(NOTIFIER)/bootstrap
 proxy: $(PROXY)/bootstrap
 authorizer: $(AUTH)/bootstrap
 keepalive: $(KEEPALIVE)/bootstrap
+notifier: $(NOTIFIER)/bootstrap
 
 # Build a host-arch bootstrap for local emulation, e.g. `make CMD=authorizer run-local`.
 $(LOCAL)/$(CMD)/bootstrap: $(shell find ./cmd/$(CMD) -name '*.go') $(COMMON_SRCS)

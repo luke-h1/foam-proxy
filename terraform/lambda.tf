@@ -6,6 +6,7 @@ locals {
   proxy_zip      = "${local.build_dir}/build/proxy.zip"
   authorizer_zip = "${local.build_dir}/build/authorizer.zip"
   keepalive_zip  = "${local.build_dir}/build/magic-keepalive.zip"
+  notifier_zip   = "${local.build_dir}/build/alarm-notifier.zip"
 
   # Canonical store for the App Review magic-link token blob. The proxy reads it at
   # request time and the magic-keepalive Lambda rotates it; seeded from
