@@ -1,0 +1,124 @@
+name: Cloudflare WAF Terraform
+
+# Zone-level WAF rate limits for the foam-app.com zone (per-IP edge limits on the
+# auth-proxy hosts). PRs get a plan; pushes to main apply. State lives in the
+# foam-production-terraform-state S3 bucket under cloudflare-waf/ - see
+# terraform/cloudflare-waf/README.md.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'terraform/cloudflare-waf/**'
+      - '.github/workflows/terraform-cloudflare-waf.yml'
+      - '.github/actions/load-cloudflare-waf-secrets/**'
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/cloudflare-waf/**'
+      - '.github/workflows/terraform-cloudflare-waf.yml'
+      - '.github/actions/load-cloudflare-waf-secrets/**'
+
+permissions:
+  contents: read
+
+# Plans and applies share one lock so a PR plan can never read state mid-apply
+# and two applies can never race.
+concurrency:
+  group: terraform-cloudflare-waf
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: terraform/cloudflare-waf
+
+jobs:
+  plan:
+    name: Terraform plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+          mask-aws-account-id: true
+
+      - name: Load cloudflare WAF secrets
+        uses: ./.github/actions/load-cloudflare-waf-secrets
+        with:
+          op_service_account_token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: |
+          terraform plan -input=false -no-color -out=tfplan
+          {
+            echo "## Cloudflare WAF terraform plan"
+            echo ""
+            echo '```'
+            terraform show -no-color tfplan | tail -n 60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: Terraform apply
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+          mask-aws-account-id: true
+
+      - name: Load cloudflare WAF secrets
+        uses: ./.github/actions/load-cloudflare-waf-secrets
+        with:
+          op_service_account_token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        run: terraform apply -input=false -auto-approve
+
+      - name: Summary
+        run: |
+          {
+            echo "## Cloudflare WAF applied"
+            echo ""
+            echo "Rate-limit ruleset ID: $(terraform output -raw rate_limit_ruleset_id)"
+          } >> "$GITHUB_STEP_SUMMARY"

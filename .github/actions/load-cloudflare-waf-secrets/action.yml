@@ -1,0 +1,24 @@
+name: 'Load Cloudflare WAF Secrets'
+description: 'Load the Cloudflare WAF terraform credentials from 1Password.'
+
+# Reads from the `foam-proxy-production` item in the `ci-cd` 1Password vault:
+#   CLOUDFLARE_WAF_API_TOKEN - token with Zone.WAF:Edit + Zone.Zone:Read on foam-app.com
+#   CLOUDFLARE_ZONE_ID       - Cloudflare zone ID for foam-app.com (not the Route53 ZONE_ID)
+# AWS creds for the state bucket come from GitHub secrets in the workflow.
+
+inputs:
+  op_service_account_token:
+    description: '1Password service account token'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Load cloudflare WAF secrets
+      uses: 1password/load-secrets-action@v3
+      with:
+        export-env: true
+      env:
+        OP_SERVICE_ACCOUNT_TOKEN: ${{ inputs.op_service_account_token }}
+        CLOUDFLARE_API_TOKEN: op://ci-cd/foam-proxy-production/CLOUDFLARE_WAF_API_TOKEN
+        TF_VAR_cloudflare_zone_id: op://ci-cd/foam-proxy-production/CLOUDFLARE_ZONE_ID
