@@ -1,5 +1,5 @@
 locals {
-  notifications_enabled = var.discord_webhook_url != "" || (var.telegram_bot_token != "" && var.telegram_chat_id != "")
+  notifications_enabled = nonsensitive(var.discord_webhook_url != "" || (var.telegram_bot_token != "" && var.telegram_chat_id != ""))
 
   monitored_functions = {
     proxy = {
