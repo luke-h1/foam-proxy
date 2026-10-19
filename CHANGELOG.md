@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Resolve invalid refresh token sentry err
 
+- **(api)** Require 3 of 5 datapoints for invocation anomaly alarms (#60)
+
 
 ### Build
 
@@ -145,6 +147,8 @@ All notable changes to this project will be documented in this file.
 - **(release)** 0.3.0 [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 
 ### Refactor
