@@ -98,14 +98,14 @@ resource "aws_iam_role_policy" "alarm_notifier_dlq" {
 resource "aws_lambda_function" "alarm_notifier" {
   count            = local.notifications_enabled ? 1 : 0
   function_name    = "${var.project_name}-alarm-notifier-${var.env}"
-  runtime          = "provided.al2023"
+  runtime          = local.lambda_runtime
   handler          = "bootstrap"
   role             = aws_iam_role.alarm_notifier_exec[0].arn
   filename         = local.notifier_zip
   source_code_hash = filebase64sha256(local.notifier_zip)
   timeout          = 30
   memory_size      = 128
-  architectures    = ["arm64"]
+  architectures    = local.lambda_architectures
   description      = "Foam proxy CloudWatch alarm notifier ${var.env}"
 
   dead_letter_config {
@@ -188,7 +188,8 @@ resource "aws_cloudwatch_metric_alarm" "invocations_anomaly" {
   alarm_name          = "${each.value.function_name}-invocations-anomaly"
   alarm_description   = each.value.description
   comparison_operator = "GreaterThanUpperThreshold"
-  evaluation_periods  = 2
+  evaluation_periods  = 5
+  datapoints_to_alarm = 3
   threshold_metric_id = "ad1"
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.lambda_alarms[0].arn]

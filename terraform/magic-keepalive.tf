@@ -55,14 +55,14 @@ resource "aws_iam_role_policy" "keepalive_ssm" {
 
 resource "aws_lambda_function" "magic_keepalive" {
   function_name    = "${var.project_name}-magic-keepalive-${var.env}"
-  runtime          = "provided.al2023"
+  runtime          = local.lambda_runtime
   handler          = "bootstrap"
   role             = aws_iam_role.keepalive_exec.arn
   filename         = local.keepalive_zip
   source_code_hash = filebase64sha256(local.keepalive_zip)
   timeout          = 30
   memory_size      = 128
-  architectures    = ["arm64"]
+  architectures    = local.lambda_architectures
   description      = "Foam App Review magic-link keepalive ${var.env}"
 
   environment {

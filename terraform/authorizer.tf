@@ -5,9 +5,9 @@ resource "aws_lambda_function" "api_authorizer" {
   role             = aws_iam_role.lambda_exec.arn
   handler          = "bootstrap"
   source_code_hash = filebase64sha256(local.authorizer_zip)
-  runtime          = "provided.al2023"
+  runtime          = local.lambda_runtime
   memory_size      = 256
-  architectures    = ["arm64"]
+  architectures    = local.lambda_architectures
   timeout          = 10
 
   tracing_config {
