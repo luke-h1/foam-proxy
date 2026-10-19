@@ -2,6 +2,9 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 locals {
+  lambda_runtime       = "provided.al2023"
+  lambda_architectures = ["arm64"]
+
   build_dir      = "${path.module}/.."
   proxy_zip      = "${local.build_dir}/build/proxy.zip"
   authorizer_zip = "${local.build_dir}/build/authorizer.zip"
@@ -91,7 +94,7 @@ resource "aws_iam_role_policy_attachment" "lambda_policy" {
 
 resource "aws_lambda_function" "lambda" {
   function_name    = "${var.project_name}-lambda-${var.env}"
-  runtime          = "provided.al2023"
+  runtime          = local.lambda_runtime
   handler          = "bootstrap"
   role             = aws_iam_role.lambda_exec.arn
   filename         = local.proxy_zip
@@ -100,7 +103,7 @@ resource "aws_lambda_function" "lambda" {
 
   description   = "Foam proxy Lambda ${var.env}"
   memory_size   = 256
-  architectures = ["arm64"]
+  architectures = local.lambda_architectures
   environment {
     variables = {
       DEPLOYED_AT          = timestamp()
