@@ -3,22 +3,11 @@
 default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
-  # Uses PATH binary (v2.15.0+); CI pins the same in .github/actions/validate.
-  - repo: local
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.15.0
     hooks:
       - id: golangci-lint
-        name: golangci-lint
-        entry: golangci-lint run --new-from-rev HEAD --fix
-        language: system
-        types: [go]
-        require_serial: true
-        pass_filenames: false
       - id: golangci-lint-config-verify
-        name: golangci-lint-config-verify
-        entry: golangci-lint config verify
-        language: system
-        files: '\.golangci\.(?:yml|yaml|toml|json)'
-        pass_filenames: false
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.13.9
