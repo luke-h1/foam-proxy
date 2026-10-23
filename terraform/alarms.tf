@@ -4,15 +4,15 @@ locals {
   monitored_functions = {
     proxy = {
       function_name = aws_lambda_function.lambda.function_name
-      description   = "Unusual invocation rate on the foam-proxy Lambda (${var.env})"
+      description   = "High invocation rate on the foam-proxy Lambda (${var.env}): >${var.invocations_alarm_threshold}/min"
     }
     authorizer = {
       function_name = aws_lambda_function.api_authorizer.function_name
-      description   = "Unusual invocation rate on the foam-proxy authorizer Lambda (${var.env})"
+      description   = "High invocation rate on the foam-proxy authorizer Lambda (${var.env}): >${var.invocations_alarm_threshold}/min"
     }
     magic_keepalive = {
       function_name = aws_lambda_function.magic_keepalive.function_name
-      description   = "Unusual invocation rate on the foam-proxy magic-keepalive Lambda (${var.env})"
+      description   = "High invocation rate on the foam-proxy magic-keepalive Lambda (${var.env}): >${var.invocations_alarm_threshold}/min"
     }
   }
 }
@@ -182,38 +182,26 @@ resource "aws_lambda_permission" "alarm_notifier_sns" {
   source_arn    = aws_sns_topic.lambda_alarms[0].arn
 }
 
-resource "aws_cloudwatch_metric_alarm" "invocations_anomaly" {
+resource "aws_cloudwatch_metric_alarm" "invocations_high" {
   for_each = local.notifications_enabled ? local.monitored_functions : {}
 
-  alarm_name          = "${each.value.function_name}-invocations-anomaly"
+  alarm_name          = "${each.value.function_name}-invocations-high"
   alarm_description   = each.value.description
-  comparison_operator = "GreaterThanUpperThreshold"
+  comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 5
   datapoints_to_alarm = 3
-  threshold_metric_id = "ad1"
+  threshold           = var.invocations_alarm_threshold
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.lambda_alarms[0].arn]
   ok_actions          = [aws_sns_topic.lambda_alarms[0].arn]
 
-  metric_query {
-    id          = "ad1"
-    expression  = "ANOMALY_DETECTION_BAND(m1, 2)"
-    label       = "Invocations (expected)"
-    return_data = true
-  }
+  metric_name = "Invocations"
+  namespace   = "AWS/Lambda"
+  period      = 60
+  statistic   = "Sum"
 
-  metric_query {
-    id          = "m1"
-    return_data = true
-    metric {
-      metric_name = "Invocations"
-      namespace   = "AWS/Lambda"
-      period      = 60
-      stat        = "Sum"
-      dimensions = {
-        FunctionName = each.value.function_name
-      }
-    }
+  dimensions = {
+    FunctionName = each.value.function_name
   }
 
   tags = merge(var.tags, {

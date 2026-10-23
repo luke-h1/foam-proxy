@@ -46,7 +46,7 @@ func TestLoadConfigDiscordOnly(t *testing.T) {
 
 func TestParseAlarmMessage(t *testing.T) {
 	raw := `{
-		"AlarmName": "foam-proxy-lambda-staging-invocations-anomaly",
+		"AlarmName": "foam-proxy-lambda-staging-invocations-high",
 		"AlarmDescription": "Unusual invocation rate",
 		"NewStateValue": "ALARM",
 		"NewStateReason": "Threshold Crossed",
@@ -219,7 +219,7 @@ func TestHandleSNS(t *testing.T) {
 	n := NewNotifier(&Config{DiscordWebhookURL: srv.URL, Environment: "staging"})
 
 	msg, _ := json.Marshal(AlarmNotification{
-		AlarmName:     "foam-proxy-lambda-staging-invocations-anomaly",
+		AlarmName:     "foam-proxy-lambda-staging-invocations-high",
 		NewStateValue: "ALARM",
 	})
 	err := n.HandleSNS(context.Background(), events.SNSEvent{
@@ -248,7 +248,7 @@ func TestHandleSNSSkipsNonAlarmStates(t *testing.T) {
 	records := make([]events.SNSEventRecord, 0, 2)
 	for _, state := range []string{"OK", "INSUFFICIENT_DATA"} {
 		msg, _ := json.Marshal(AlarmNotification{
-			AlarmName:     "foam-proxy-lambda-staging-invocations-anomaly",
+			AlarmName:     "foam-proxy-lambda-staging-invocations-high",
 			NewStateValue: state,
 		})
 		records = append(records, events.SNSEventRecord{

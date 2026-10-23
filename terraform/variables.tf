@@ -103,6 +103,17 @@ variable "reviewer_account_refresh_enabled" {
   default     = false
 }
 
+variable "invocations_alarm_threshold" {
+  type        = number
+  description = "Invocations per minute that trips the high-invocation alarm (3 of 5 periods)."
+  default     = 30
+
+  validation {
+    condition     = var.invocations_alarm_threshold >= 10 && floor(var.invocations_alarm_threshold) == var.invocations_alarm_threshold
+    error_message = "invocations_alarm_threshold must be an integer >= 10."
+  }
+}
+
 variable "discord_webhook_url" {
   type        = string
   description = "The discord webhook URL used for receiving alarm notifications"
