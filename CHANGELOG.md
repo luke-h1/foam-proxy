@@ -156,6 +156,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Update go to 1.27.0 (#62)
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
