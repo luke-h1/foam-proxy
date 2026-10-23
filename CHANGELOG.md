@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Require 3 of 5 datapoints for invocation anomaly alarms (#60)
 
+- **(api)** Replace invocation anomaly alarms with fixed threshold (#63)
+
 
 ### Build
 
@@ -157,6 +159,8 @@ All notable changes to this project will be documented in this file.
 - **(api)** Update go to 1.27.0 (#62)
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 
 ### Refactor
