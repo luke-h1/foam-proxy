@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/json"
-	"fmt"
+	"log/slog"
+	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
@@ -13,27 +13,40 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-type ProxyRequests struct {
-	config     *config.Proxy
-	twitch     *services.TwitchService
-	magicCache *magicLinkCache
+type twitchClient interface {
+	DefaultToken(ctx context.Context) (*services.TwitchTokenResponse, error)
+	RefreshToken(ctx context.Context, token string) (*services.TwitchRefreshTokenResponse, error)
 }
 
-func NewProxyRequests(cfg *config.Proxy, twitch *services.TwitchService) *ProxyRequests {
+type Requests struct {
+	config       *config.Proxy
+	twitch       twitchClient
+	magicCache   *magicLinkCache
+	magicKeyHash [32]byte
+	hasMagicKey  bool
+}
+
+func NewRequests(cfg *config.Proxy, twitch twitchClient) *Requests {
 	var envLink *config.MagicLink
+	p := &Requests{config: cfg, twitch: twitch}
 	if cfg != nil {
 		envLink = cfg.MagicLink
+		if cfg.MagicLinkAPIKey != "" {
+			p.magicKeyHash = sha256.Sum256([]byte(cfg.MagicLinkAPIKey))
+			p.hasMagicKey = true
+		}
 	}
-	return &ProxyRequests{config: cfg, twitch: twitch, magicCache: newMagicLinkCache(nil, envLink)}
+	p.magicCache = newMagicLinkCache(nil, envLink)
+	return p
 }
 
-func (p *ProxyRequests) setMagicStore(source magicLinkSource) {
+func (p *Requests) setMagicStore(source magicLinkSource) {
 	p.magicCache.source = source
 }
 
-func (p *ProxyRequests) Handle(req *events.APIGatewayProxyRequest) Response {
+func (p *Requests) Handle(ctx context.Context, req *events.APIGatewayProxyRequest) Response {
 	if req == nil {
-		return p.jsonResponse(500, map[string]string{"error": "invalid request"})
+		return p.jsonResponse(http.StatusInternalServerError, map[string]string{"error": "invalid request"})
 	}
 
 	switch req.Path {
@@ -42,41 +55,40 @@ func (p *ProxyRequests) Handle(req *events.APIGatewayProxyRequest) Response {
 	case "/api/proxy":
 		return p.handleProxy()
 	case "/api/token":
-		return p.handleToken()
+		return p.handleToken(ctx)
 	case "/api/refresh-token":
-		return p.handleRefreshToken(req)
+		return p.handleRefreshToken(ctx, req)
 	case "/api/magic":
-		return p.handleMagic(req)
+		return p.handleMagic(ctx, req)
 	case "/api/healthcheck":
-		return p.handleHealth()
+		return p.handleHealth(ctx)
 	case "/api/version":
 		return p.handleVersion()
 	default:
-		return p.jsonResponse(404, map[string]string{"error": "not found"})
+		return p.jsonResponse(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
 }
 
-func (p *ProxyRequests) handleHealth() Response {
-	meter := sentry.NewMeter(context.Background())
-	meter.Count("health.check", 1)
+func (p *Requests) handleHealth(ctx context.Context) Response {
+	sentry.NewMeter(ctx).Count("health.check", 1)
 
-	return p.jsonResponse(200, map[string]string{
+	return p.jsonResponse(http.StatusOK, map[string]string{
 		"status": "OK",
 	})
 }
 
-func (p *ProxyRequests) handlePending() Response {
+func (p *Requests) handlePending() Response {
 	safeLog("[AUTHDBG] pending page served", map[string]string{
 		"target": "foam://",
 	})
-	return htmlResponse(200, redirectPage("Foam - Pending", "foam://"))
+	return htmlResponse(http.StatusOK, redirectPage("Foam - Pending", "foam://"))
 }
 
-func (p *ProxyRequests) handleProxy() Response {
+func (p *Requests) handleProxy() Response {
 	safeLog("[AUTHDBG] proxy page served", map[string]string{
 		"target": "foam://",
 	})
-	return htmlResponse(200, redirectPage("Foam - Redirecting", "foam://"))
+	return htmlResponse(http.StatusOK, redirectPage("Foam - Redirecting", "foam://"))
 }
 
 // resolveScheme picks the magic-link redirect scheme from the request's ?scheme
@@ -90,49 +102,43 @@ func resolveScheme(req *events.APIGatewayProxyRequest) string {
 	return config.ResolveAppScheme(requested)
 }
 
-func (p *ProxyRequests) handleToken() Response {
-	data, err := p.twitch.DefaultToken()
-
+func (p *Requests) handleToken(ctx context.Context) Response {
+	data, err := p.twitch.DefaultToken(ctx)
 	if err != nil {
-		return p.jsonResponse(200, map[string]interface{}{
+		return p.jsonResponse(http.StatusBadGateway, map[string]any{
 			"data":  nil,
 			"error": err.Error(),
 		})
 	}
 
-	return p.jsonResponse(200, map[string]interface{}{"data": data, "error": nil})
+	return p.jsonResponse(http.StatusOK, map[string]any{"data": data, "error": nil})
 }
 
-func (p *ProxyRequests) handleRefreshToken(req *events.APIGatewayProxyRequest) Response {
+func (p *Requests) handleRefreshToken(ctx context.Context, req *events.APIGatewayProxyRequest) Response {
 	token := ""
 	if req.QueryStringParameters != nil {
 		token = req.QueryStringParameters["token"]
 	}
 
 	if token == "" {
-		return p.jsonResponse(400, map[string]interface{}{
+		return p.jsonResponse(http.StatusBadRequest, map[string]any{
 			"data":  nil,
 			"error": "token query param is required",
 		})
 	}
 
-	data, err := p.twitch.RefreshToken(token)
+	data, err := p.twitch.RefreshToken(ctx, token)
 	if err != nil {
-		return p.jsonResponse(200, map[string]interface{}{
+		return p.jsonResponse(http.StatusBadGateway, map[string]any{
 			"data":  nil,
 			"error": err.Error(),
 		})
 	}
 
-	return p.jsonResponse(200, map[string]interface{}{"data": data, "error": nil})
+	return p.jsonResponse(http.StatusOK, map[string]any{"data": data, "error": nil})
 }
 
-func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response {
-	expectedKey := ""
-	if p.config != nil {
-		expectedKey = p.config.MagicLinkAPIKey
-	}
-
+func (p *Requests) handleMagic(ctx context.Context, req *events.APIGatewayProxyRequest) Response {
 	key := ""
 	format := ""
 	if req.QueryStringParameters != nil {
@@ -140,27 +146,25 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 		format = req.QueryStringParameters["format"]
 	}
 
-	if expectedKey == "" || key == "" {
-		return p.jsonResponse(404, map[string]string{"error": "not found"})
+	if !p.hasMagicKey || key == "" {
+		return p.jsonResponse(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
 
 	providedKey := sha256.Sum256([]byte(key))
-	expected := sha256.Sum256([]byte(expectedKey))
-	if subtle.ConstantTimeCompare(providedKey[:], expected[:]) != 1 {
-		return p.jsonResponse(404, map[string]string{"error": "not found"})
+	if subtle.ConstantTimeCompare(providedKey[:], p.magicKeyHash[:]) != 1 {
+		return p.jsonResponse(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
 
-	// only authenticated requests pay for the SSM-backed cache read
-	magic := p.magicCache.Resolve()
+	magic := p.magicCache.Resolve(ctx)
 	if magic == nil {
-		return p.jsonResponse(404, map[string]string{"error": "not found"})
+		return p.jsonResponse(http.StatusNotFound, map[string]string{"error": "not found"})
 	}
 
 	if format == "json" {
 		safeLog("[AUTHDBG] magic link served", map[string]string{
 			"target": "json",
 		})
-		return noStore(p.jsonResponse(200, magicTokenBlob(magic)))
+		return noStore(p.jsonResponse(http.StatusOK, magicTokenBlob(magic)))
 	}
 
 	scheme := resolveScheme(req)
@@ -168,11 +172,10 @@ func (p *ProxyRequests) handleMagic(req *events.APIGatewayProxyRequest) Response
 		"target": scheme + "://auth",
 	})
 
-	// return deep-link for app-store reviewer
-	return noStore(htmlResponse(200, redirectTargetPage("Foam - Signing in", magicTargetURL(magic, scheme))))
+	return noStore(htmlResponse(http.StatusOK, redirectTargetPage("Foam - Signing in", magicTargetURL(magic, scheme))))
 }
 
-func (p *ProxyRequests) handleVersion() Response {
+func (p *Requests) handleVersion() Response {
 	out := map[string]string{
 		"deployedBy": "unknown",
 		"deployedAt": "unknown",
@@ -185,10 +188,13 @@ func (p *ProxyRequests) handleVersion() Response {
 		out["gitSHA"] = p.config.GitSHA
 	}
 
-	return p.jsonResponse(200, out)
+	return p.jsonResponse(http.StatusOK, out)
 }
 
 func safeLog(message string, fields map[string]string) {
-	body, _ := json.Marshal(fields)
-	fmt.Printf(`{"level":"info","msg":%q,"fields":%s}`+"\n", message, string(body))
+	args := make([]any, 0, len(fields)*2)
+	for key, value := range fields {
+		args = append(args, key, value)
+	}
+	slog.Info(message, args...)
 }

@@ -1,7 +1,10 @@
 {
+  "version": "2.0",
   "type": "REQUEST",
-  "methodArn": "arn:aws:execute-api:eu-west-1:000000000000:local/GET/api/proxy",
-  "identitySource": "replace-with-API_KEY",
+  "routeArn": "arn:aws:execute-api:eu-west-1:000000000000:local/$default/GET/api/token",
+  "routeKey": "GET /api/token",
+  "rawPath": "/api/token",
+  "identitySource": ["replace-with-API_KEY"],
   "headers": {
     "x-api-key": "replace-with-API_KEY"
   }

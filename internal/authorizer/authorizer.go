@@ -2,7 +2,10 @@ package authorizer
 
 import (
 	"context"
-	"log"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/json"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -13,125 +16,69 @@ import (
 )
 
 type RequestEvent struct {
-	Type                  string                 `json:"type"`
-	MethodArn             string                 `json:"methodArn"`
-	Headers               map[string]interface{} `json:"headers"`
-	QueryStringParameters map[string]interface{} `json:"queryStringParameters"`
-	IdentitySource        string                 `json:"identitySource"`
+	Version               string            `json:"version"`
+	Type                  string            `json:"type"`
+	RouteArn              string            `json:"routeArn"`
+	Headers               map[string]string `json:"headers"`
+	QueryStringParameters map[string]string `json:"queryStringParameters"`
+	IdentitySource        json.RawMessage   `json:"identitySource"`
 }
 
 type Handler struct {
-	expectedAPIKey string
+	expectedKeyHash [32]byte
+	hasKey          bool
 }
 
 func NewHandler() *Handler {
 	key := os.Getenv("API_KEY")
-	if key != "" {
-		return &Handler{
-			expectedAPIKey: key,
-		}
+	if key == "" {
+		slog.Warn("API_KEY is unset; denying every request")
+		return &Handler{}
 	}
-	log.Print("API_KEY not set")
-	return &Handler{}
+
+	return &Handler{
+		expectedKeyHash: sha256.Sum256([]byte(key)),
+		hasKey:          true,
+	}
 }
 
-func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events.APIGatewayCustomAuthorizerResponse, error) {
-	methodArn := input.MethodArn
-
-	if methodArn == "" {
-		methodArn = "*"
-	}
-
-	deny := func(reason string) (events.APIGatewayCustomAuthorizerResponse, error) {
+func (h *Handler) HandleRequest(ctx context.Context, input RequestEvent) (events.APIGatewayV2CustomAuthorizerSimpleResponse, error) {
+	deny := func(reason string) (events.APIGatewayV2CustomAuthorizerSimpleResponse, error) {
 		if reason != "" {
-			sentry.NewMeter(ctx).Count("authorizer.deny", 1,
-				sentry.WithAttributes(attribute.String("reason", reason)),
-			)
+			sentry.NewMeter(ctx).Count("authorizer.deny", 1, sentry.WithAttributes(attribute.String("reason", reason)))
 		}
-		return generatePolicy("user", "Deny", methodArn), nil
+		return events.APIGatewayV2CustomAuthorizerSimpleResponse{IsAuthorized: false}, nil
 	}
 
-	if h.expectedAPIKey == "" {
-		return deny("api_key_not_configured")
+	if !h.hasKey {
+		return deny("denied")
 	}
 
-	headers := normalizeMap(input.Headers)
-	query := normalizeMap(input.Headers)
-
-	apiKey := headers["x-api-key"]
-
-	if apiKey == "" {
-		apiKey = query["apikey"]
+	apiKey := normalizeMap(input.Headers)["x-api-key"]
+	if !h.keyMatches(apiKey) {
+		slog.Info("authorizer deny", "reason", "invalid_or_missing_key")
+		return deny("denied")
 	}
 
-	if apiKey == "" {
-		apiKey = input.IdentitySource
-	}
-
-	if !constantTimeEquals(apiKey, h.expectedAPIKey) {
-		log.Printf(`{"level":"info","msg":"authorizer deny","reason":"invalid_or_missing_key"}`)
-		return deny("invalid_or_missing_key")
-	}
 	sentry.NewMeter(ctx).Count("authorizer.allow", 1)
-	return generatePolicy("user", "Allow", methodArn), nil
+	return events.APIGatewayV2CustomAuthorizerSimpleResponse{IsAuthorized: true}, nil
 }
 
-func generatePolicy(principalID, effect, resource string) events.APIGatewayCustomAuthorizerResponse {
-	return events.APIGatewayCustomAuthorizerResponse{
-		PrincipalID: principalID,
-		PolicyDocument: events.APIGatewayCustomAuthorizerPolicy{
-			Version: "2012-10-17",
-			Statement: []events.IAMPolicyStatement{
-				{
-					Action:   []string{"execute-api:Invoke"},
-					Effect:   effect,
-					Resource: []string{resource},
-				},
-			},
-		},
-	}
+func (h *Handler) keyMatches(provided string) bool {
+	sum := sha256.Sum256([]byte(provided))
+	return subtle.ConstantTimeCompare(sum[:], h.expectedKeyHash[:]) == 1
 }
 
-func normalizeMap(m map[string]interface{}) map[string]string {
-	if m == nil {
+func normalizeMap(m map[string]string) map[string]string {
+	if len(m) == 0 {
 		return nil
 	}
 
 	out := make(map[string]string, len(m))
-
 	for k, v := range m {
-		if s, ok := v.(string); ok {
-			out[strings.ToLower(k)] = s
-		}
+		out[strings.ToLower(k)] = v
 	}
 	return out
-}
-
-func constantTimeEquals(a, b string) bool {
-	if len(a) != len(b) {
-		// Still run loop over max length so timing doesn't leak length.
-		n := len(a)
-		if len(b) > n {
-			n = len(b)
-		}
-		var result int
-		for i := 0; i < n; i++ {
-			var ac, bc byte
-			if i < len(a) {
-				ac = a[i]
-			}
-			if i < len(b) {
-				bc = b[i]
-			}
-			result |= int(ac ^ bc)
-		}
-		return false
-	}
-	var result int
-	for i := 0; i < len(a); i++ {
-		result |= int(a[i] ^ b[i])
-	}
-	return result == 0
 }
 
 func InitSentry() {

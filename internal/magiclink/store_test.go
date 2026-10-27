@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/aws/smithy-go"
 )
 
 type fakeSSMClient struct {
@@ -21,7 +20,7 @@ type fakeSSMClient struct {
 	putErrs  []error
 }
 
-func (f *fakeSSMClient) GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+func (f *fakeSSMClient) GetParameter(_ context.Context, _ *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 	err := errAt(f.getErrs, f.getCalls)
 	f.getCalls++
 	if err != nil {
@@ -30,7 +29,7 @@ func (f *fakeSSMClient) GetParameter(ctx context.Context, params *ssm.GetParamet
 	return f.getOut, nil
 }
 
-func (f *fakeSSMClient) PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+func (f *fakeSSMClient) PutParameter(_ context.Context, _ *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
 	err := errAt(f.putErrs, f.putCalls)
 	f.putCalls++
 	if err != nil {
@@ -66,6 +65,15 @@ func TestStoreGetRetriesThenSucceeds(t *testing.T) {
 	}
 	if client.getCalls != 3 {
 		t.Fatalf("getCalls = %d, want 3", client.getCalls)
+	}
+}
+
+func TestStoreGetRejectsEmptyParameter(t *testing.T) {
+	store := &Store{client: &fakeSSMClient{}, param: "/foo"}
+
+	_, err := store.Get(context.Background())
+	if err == nil {
+		t.Fatal("Get() error = nil, want error")
 	}
 }
 
@@ -106,8 +114,32 @@ func TestStoreGetReturnsCtxErrWhenCancelledDuringBackoff(t *testing.T) {
 	}
 }
 
+func TestBackoffCeilingDoublesUntilCap(t *testing.T) {
+	if got := backoffCeiling(1); got != retryBaseWait {
+		t.Fatalf("ceiling(1) = %v, want %v", got, retryBaseWait)
+	}
+	if got := backoffCeiling(2); got != retryBaseWait*2 {
+		t.Fatalf("ceiling(2) = %v, want %v", got, retryBaseWait*2)
+	}
+	if got := backoffCeiling(20); got != retryMaxWait {
+		t.Fatalf("ceiling(20) = %v, want %v", got, retryMaxWait)
+	}
+}
+
+func TestBackoffDelayStaysInsideCeiling(t *testing.T) {
+	for attempt := 1; attempt <= 4; attempt++ {
+		ceiling := backoffCeiling(attempt)
+		for range 30 {
+			got := backoffDelay(attempt)
+			if got < 0 || got >= ceiling {
+				t.Fatalf("attempt %d delay %v outside [0, %v)", attempt, got, ceiling)
+			}
+		}
+	}
+}
+
 func TestStoreGetFailsFastOnPermanentError(t *testing.T) {
-	permanent := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "denied"}
+	permanent := &types.AccessDeniedException{Message: aws.String("denied")}
 	client := &fakeSSMClient{
 		getErrs: []error{permanent, permanent, permanent},
 	}

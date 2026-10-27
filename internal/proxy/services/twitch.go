@@ -4,21 +4,29 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/getsentry/sentry-go/attribute"
 )
 
-func captureTwitchError(operation string, err error, reason string, latencyMs float64, statusCode int, responseBody string) {
+func captureTwitchError(ctx context.Context, operation string, err error, reason string, latencyMs float64, statusCode int, responseBody string) {
 	if err == nil {
 		return
 	}
-	sentry.WithScope(func(scope *sentry.Scope) {
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		hub = sentry.CurrentHub()
+	}
+	hub.WithScope(func(scope *sentry.Scope) {
 		scope.SetTag("twitch.operation", operation)
 		scope.SetTag("twitch.error_reason", reason)
 		scope.SetLevel(sentry.LevelError)
@@ -31,7 +39,7 @@ func captureTwitchError(operation string, err error, reason string, latencyMs fl
 		if responseBody != "" {
 			scope.SetExtra("twitch.response_body", responseBody)
 		}
-		sentry.CaptureException(err)
+		hub.CaptureException(err)
 	})
 }
 
@@ -43,12 +51,15 @@ type twitchErrorResponse struct {
 func twitchErrorFromResponse(statusCode int, body []byte) error {
 	var twErr twitchErrorResponse
 	if json.Unmarshal(body, &twErr) == nil && twErr.Message != "" {
-		return fmt.Errorf("%s", twErr.Message)
+		return errors.New(twErr.Message)
 	}
 	return fmt.Errorf("twitch error: %d %s", statusCode, string(bytes.TrimSpace(body)))
 }
 
-const twitchIdUrl = "https://id.twitch.tv/oauth2/token"
+const (
+	twitchIDURL    = "https://id.twitch.tv/oauth2/token"
+	defaultTimeout = 8 * time.Second
+)
 
 type TwitchTokenResponse struct {
 	AccessToken string   `json:"access_token"`
@@ -73,133 +84,118 @@ type TwitchService struct {
 }
 
 func NewTwitchService(clientID, clientSecret string, timeout time.Duration) *TwitchService {
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+
 	return &TwitchService{
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		baseURL:      twitchIdUrl,
-		httpClient:   &http.Client{Timeout: timeout},
+		baseURL:      twitchIDURL,
+		httpClient: &http.Client{
+			Timeout: timeout,
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				MaxIdleConns:          10,
+				MaxIdleConnsPerHost:   2,
+				IdleConnTimeout:       60 * time.Second,
+				TLSHandshakeTimeout:   2 * time.Second,
+				ResponseHeaderTimeout: timeout,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
 	}
 }
 
-// request a client_credentials token from Twitch
-func (s *TwitchService) DefaultToken() (*TwitchTokenResponse, error) {
-	meter := sentry.NewMeter(context.Background())
-	recordTokenMetric := func(outcome string, reason string, latencyMs float64) {
-		attrs := []attribute.Builder{attribute.String("outcome", outcome)}
-		if reason != "" {
-			attrs = append(attrs, attribute.String("reason", reason))
-		}
-		meter.Count("twitch.token.request", 1, sentry.WithAttributes(attrs...))
-		if latencyMs >= 0 {
-			meter.Distribution("twitch.token.latency_ms", latencyMs, sentry.WithUnit(sentry.UnitMillisecond))
-		}
-	}
-
+// request a client_credentials token from Twitch.
+func (s *TwitchService) DefaultToken(ctx context.Context) (*TwitchTokenResponse, error) {
 	form := url.Values{}
 	form.Set("client_id", s.clientID)
 	form.Set("client_secret", s.clientSecret)
 	form.Set("grant_type", "client_credentials")
-	body := form.Encode()
-
-	req, err := http.NewRequest(http.MethodPost, s.baseURL, bytes.NewBufferString(body))
-	if err != nil {
-		recordTokenMetric("error", "request_build", -1)
-		captureTwitchError("token", err, "request_build", -1, 0, "")
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	start := time.Now()
-	resp, err := s.httpClient.Do(req)
-	latencyMs := float64(time.Since(start).Milliseconds())
-
-	if err != nil {
-		recordTokenMetric("error", "request_failed", latencyMs)
-		captureTwitchError("token", err, "request_failed", latencyMs, 0, "")
-		return nil, err
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		recordTokenMetric("error", "bad_status", latencyMs)
-		upstreamErr := twitchErrorFromResponse(resp.StatusCode, bodyBytes)
-		captureTwitchError("token", upstreamErr, "bad_status", latencyMs, resp.StatusCode, string(bodyBytes))
-		return nil, upstreamErr
-	}
 
 	var out TwitchTokenResponse
-	if err := json.Unmarshal(bodyBytes, &out); err != nil {
-		recordTokenMetric("error", "decode_failed", latencyMs)
-		captureTwitchError("token", err, "decode_failed", latencyMs, resp.StatusCode, string(bodyBytes))
+	if err := s.postForm(ctx, "token", "twitch.token", form, &out); err != nil {
 		return nil, err
 	}
-
-	recordTokenMetric("success", "", latencyMs)
 	return &out, nil
 }
 
-func (s *TwitchService) RefreshToken(token string) (*TwitchRefreshTokenResponse, error) {
-	meter := sentry.NewMeter(context.Background())
-
-	recordRefreshTokenMetric := func(outcome string, reason string, latencyMs float64) {
-		attrs := []attribute.Builder{attribute.String("outcome", outcome)}
-		if reason != "" {
-			attrs = append(attrs, attribute.String("reason", reason))
-		}
-		meter.Count("twitch.refresh_token.request", 1, sentry.WithAttributes(attrs...))
-		if latencyMs >= 0 {
-			meter.Distribution("twitch.refresh_token.latency_ms", latencyMs, sentry.WithUnit(sentry.UnitMillisecond))
-		}
-	}
-
+func (s *TwitchService) RefreshToken(ctx context.Context, token string) (*TwitchRefreshTokenResponse, error) {
 	form := url.Values{}
-
 	form.Set("client_id", s.clientID)
 	form.Set("client_secret", s.clientSecret)
 	form.Set("grant_type", "refresh_token")
 	form.Set("refresh_token", token)
 
-	body := form.Encode()
-
-	req, err := http.NewRequest(http.MethodPost, s.baseURL, bytes.NewBufferString(body))
-	if err != nil {
-		recordRefreshTokenMetric("error", "request_build", -1)
-		captureTwitchError("refresh_token", err, "request_build", -1, 0, "")
+	var out TwitchRefreshTokenResponse
+	if err := s.postForm(ctx, "refresh_token", "twitch.refresh_token", form, &out); err != nil {
 		return nil, err
 	}
+	return &out, nil
+}
 
+func (s *TwitchService) postForm(ctx context.Context, operation, metricPrefix string, form url.Values, dest any) error {
+	meter := sentry.NewMeter(ctx)
+	record := func(outcome, reason string, latencyMs float64) {
+		attrs := []attribute.Builder{attribute.String("outcome", outcome)}
+		if reason != "" {
+			attrs = append(attrs, attribute.String("reason", reason))
+		}
+		meter.Count(metricPrefix+".request", 1, sentry.WithAttributes(attrs...))
+		if latencyMs >= 0 {
+			meter.Distribution(metricPrefix+".latency_ms", latencyMs, sentry.WithUnit(sentry.UnitMillisecond))
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		err = fmt.Errorf("twitch: build request: %w", err)
+		record("error", "request_build", -1)
+		captureTwitchError(ctx, operation, err, "request_build", -1, 0, "")
+		return err
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	start := time.Now()
 	resp, err := s.httpClient.Do(req)
 	latencyMs := float64(time.Since(start).Milliseconds())
-
 	if err != nil {
-		recordRefreshTokenMetric("error", "request_failed", latencyMs)
-		captureTwitchError("refresh_token", err, "request_failed", latencyMs, 0, "")
-		return nil, err
+		err = fmt.Errorf("twitch: do request: %w", err)
+		record("error", "request_failed", latencyMs)
+		captureTwitchError(ctx, operation, err, "request_failed", latencyMs, 0, "")
+		return err
 	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.Warn("close twitch response body", "err", closeErr)
+		}
+	}()
 
-	defer func() { _ = resp.Body.Close() }()
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		err = fmt.Errorf("twitch: read response: %w", err)
+		record("error", "read_failed", latencyMs)
+		captureTwitchError(ctx, operation, err, "read_failed", latencyMs, resp.StatusCode, "")
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
-		recordRefreshTokenMetric("error", "bad_status", latencyMs)
+		record("error", "bad_status", latencyMs)
 		upstreamErr := twitchErrorFromResponse(resp.StatusCode, bodyBytes)
-		captureTwitchError("refresh_token", upstreamErr, "bad_status", latencyMs, resp.StatusCode, string(bodyBytes))
-		return nil, upstreamErr
+		captureTwitchError(ctx, operation, upstreamErr, "bad_status", latencyMs, resp.StatusCode, string(bodyBytes))
+		return upstreamErr
+	}
+	if err := json.Unmarshal(bodyBytes, dest); err != nil {
+		err = fmt.Errorf("twitch: decode response: %w", err)
+		record("error", "decode_failed", latencyMs)
+		captureTwitchError(ctx, operation, err, "decode_failed", latencyMs, resp.StatusCode, "")
+		return err
 	}
 
-	var out TwitchRefreshTokenResponse
-	if err := json.Unmarshal(bodyBytes, &out); err != nil {
-		recordRefreshTokenMetric("error", "decode_failed", latencyMs)
-		captureTwitchError("refresh_token", err, "decode_failed", latencyMs, resp.StatusCode, string(bodyBytes))
-		return nil, err
-	}
-
-	recordRefreshTokenMetric("success", "", latencyMs)
-	return &out, nil
+	record("success", "", latencyMs)
+	return nil
 }

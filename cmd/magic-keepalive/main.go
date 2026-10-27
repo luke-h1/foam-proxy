@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -15,6 +15,7 @@ import (
 )
 
 func main() {
+	config.InitLogger()
 	config.InitSentry("REFRESH_DSN")
 	lambda.Start(handle)
 }
@@ -46,7 +47,7 @@ func finishCheckIn(id *sentry.EventID, monitor *sentry.MonitorConfig, status sen
 // SSM only touched) during App Review windows.
 func handle(ctx context.Context) error {
 	if !enabled() {
-		log.Print("REVIEWER_ACCOUNT_REFRESH_ENABLED is off; skipping refresh")
+		slog.Info("REVIEWER_ACCOUNT_REFRESH_ENABLED is off; skipping refresh")
 		return nil
 	}
 
@@ -60,11 +61,11 @@ func handle(ctx context.Context) error {
 	})
 
 	if err := run(ctx); err != nil {
-		log.Printf("magic link keepalive failed: %v", err)
 		// Already rotated: the token is dead, so retrying is futile. Close the
 		// check-in as error to surface the dead-token state, but return nil so
 		// EventBridge doesn't re-invoke. Pre-refresh failures stay retryable.
 		if errors.Is(err, magickeepalive.ErrTokenRotated) {
+			slog.Error("magic link keepalive rotated token but did not persist it", "err", err)
 			finishCheckIn(checkInID, monitor, sentry.CheckInStatusError)
 			sentry.CaptureException(err)
 			sentry.Flush(2 * time.Second)
@@ -78,7 +79,7 @@ func handle(ctx context.Context) error {
 
 	finishCheckIn(checkInID, monitor, sentry.CheckInStatusOK)
 	sentry.Flush(2 * time.Second)
-	log.Print("refreshed magic link keepalive token")
+	slog.Info("refreshed magic link keepalive token")
 	return nil
 }
 
@@ -97,7 +98,7 @@ func enabled() bool {
 	}
 	v, err := strconv.ParseBool(raw)
 	if err != nil {
-		log.Printf("invalid REVIEWER_ACCOUNT_REFRESH_ENABLED %q; treating as disabled: %v", raw, err)
+		slog.Warn("invalid REVIEWER_ACCOUNT_REFRESH_ENABLED; treating as disabled", "value", raw, "err", err)
 		return false
 	}
 	return v

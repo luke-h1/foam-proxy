@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
+	"net/http"
 	"net/url"
-	"sort"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -18,7 +18,7 @@ import (
 )
 
 type Handler struct {
-	proxyRequests *ProxyRequests
+	proxyRequests *Requests
 }
 
 const sentryFlushTimeout = 250 * time.Millisecond
@@ -40,22 +40,15 @@ func sanitizeQuery(query map[string]string) map[string]string {
 	out := make(map[string]string, len(query))
 	for key, value := range query {
 		switch key {
-		case "access_token", "code", "refresh_token", "state":
+		case "key":
+			out[key] = "[redacted]"
+		case "access_token", "code", "refresh_token", "state", "token":
 			out[key] = redactValue(value)
 		default:
 			out[key] = value
 		}
 	}
 	return out
-}
-
-func sortedKeys(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func NewHandler() (*Handler, error) {
@@ -65,19 +58,15 @@ func NewHandler() (*Handler, error) {
 	}
 
 	twitchService := services.NewTwitchService(cfg.TwitchClientID, cfg.TwitchClientSecret, cfg.TwitchTimeout)
-	proxyRequests := NewProxyRequests(cfg, twitchService)
+	proxyRequests := NewRequests(cfg, twitchService)
 
-	// Read the canonical magic-link blob from SSM at request time. Without a param
-	// (local/dev) the handler falls back to the MAGIC_LINK_BLOB env var.
 	if cfg.MagicLinkSSMParam != "" {
 		store, storeErr := magiclink.NewStore(context.Background(), cfg.MagicLinkSSMParam)
 		if storeErr != nil {
-			// No env fallback (prod): a nil store silently 404s /api/magic, so
-			// fail fast rather than look like "feature disabled".
 			if cfg.MagicLink == nil {
 				return nil, fmt.Errorf("magic link SSM store init failed: %w", storeErr)
 			}
-			log.Printf("magic link SSM store init failed, using env blob fallback: %v", storeErr)
+			slog.Error("magic link SSM store init failed, using env blob fallback", "err", storeErr)
 		} else {
 			proxyRequests.setMagicStore(store)
 		}
@@ -87,60 +76,73 @@ func NewHandler() (*Handler, error) {
 }
 
 func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGatewayProxyRequest) (*events.APIGatewayProxyResponse, error) {
-	defer sentry.Flush(sentryFlushTimeout)
+	flushFor := 20 * time.Millisecond
+	defer func() { sentry.Flush(flushFor) }()
 
 	if input == nil {
-		return apiResponse(500, DefaultHeaders(), map[string]string{"error": "invalid request"}), nil
+		flushFor = sentryFlushTimeout
+		return apiResponse(http.StatusInternalServerError, DefaultHeaders(), map[string]string{"error": "invalid request"}), nil
 	}
+
+	hub := sentry.CurrentHub().Clone()
+	ctx = sentry.SetHubOnContext(ctx, hub)
 
 	requestID := input.RequestContext.RequestID
 	requestURL := buildRequestURL(input)
 	method := input.RequestContext.HTTPMethod
 	if method == "" {
-		method = "GET"
+		method = http.MethodGet
 	}
-	tx := sentry.StartTransaction(ctx, method+" "+input.Path,
-		sentry.WithOpName("http.server"),
-		sentry.WithTransactionSource(sentry.SourceRoute),
-	)
-	defer tx.Finish()
 
-	sentry.ConfigureScope(func(scope *sentry.Scope) {
-		scope.SetTag("request_id", requestID)
-		scope.SetTag("path", input.Path)
-		scope.SetTag("http.method", method)
-		scope.SetContext("request", sentry.Context{
-			"id":     requestID,
-			"url":    requestURL,
-			"method": method,
-			"path":   input.Path,
-			"query":  sanitizeQuery(input.QueryStringParameters),
-		})
-		scope.AddBreadcrumb(&sentry.Breadcrumb{
-			Category: "request",
-			Message:  method + " " + input.Path,
-			Level:    sentry.LevelInfo,
-			Data:     map[string]any{"request_id": requestID},
-		}, 0)
+	hub.Scope().SetTag("request_id", requestID)
+	hub.Scope().SetTag("path", input.Path)
+	hub.Scope().SetTag("http.method", method)
+	hub.Scope().SetContext("request", sentry.Context{
+		"id":     requestID,
+		"url":    requestURL,
+		"method": method,
+		"path":   input.Path,
+		"query":  sanitizeQuery(input.QueryStringParameters),
 	})
 
-	meter := sentry.NewMeter(tx.Context())
-	meter.SetAttributes(
-		attribute.String("http.method", method),
-		attribute.String("http.route", input.Path),
-	)
-	meter.Count("proxy.request", 1)
+	isHealth := input.Path == "/api/healthcheck"
+	var tx *sentry.Span
+	if !isHealth {
+		tx = sentry.StartTransaction(ctx, method+" "+input.Path,
+			sentry.WithOpName("http.server"),
+			sentry.WithTransactionSource(sentry.SourceRoute),
+		)
+		defer tx.Finish()
+		ctx = sentry.SetHubOnContext(tx.Context(), hub)
+	}
 
 	start := time.Now()
-	log.Printf(`{"level":"info","msg":"request","request_id":%q,"path":%q,"url":%q,"method":%q,"query":%s,"query_keys":%q}`, requestID, input.Path, requestURL, method, mustJSON(sanitizeQuery(input.QueryStringParameters)), sortedKeys(input.QueryStringParameters))
-	response := handler.proxyRequests.Handle(input)
+	slog.Info("request", "request_id", requestID, "path", input.Path, "method", method)
+	response := handler.proxyRequests.Handle(ctx, input)
 	elapsed := time.Since(start)
-	log.Printf(`{"level":"info","msg":"response","request_id":%q,"path":%q,"status":%d,"content_type":%q,"location":%q,"body_preview":%q}`, requestID, input.Path, response.StatusCode, response.Headers["Content-Type"], response.Headers["Location"], bodyPreview(response.Body))
+	slog.Info("response",
+		"request_id", requestID,
+		"path", input.Path,
+		"status", response.StatusCode,
+		"duration_ms", elapsed.Milliseconds(),
+	)
 
-	tx.Status = spanStatusForHTTP(response.StatusCode)
-	statusAttr := sentry.WithAttributes(attribute.Int("http.status_code", response.StatusCode))
-	meter.Count("proxy.response", 1, statusAttr)
-	meter.Distribution("proxy.request.duration_ms", float64(elapsed.Milliseconds()), sentry.WithUnit(sentry.UnitMillisecond), statusAttr)
+	if response.StatusCode >= http.StatusInternalServerError {
+		flushFor = sentryFlushTimeout
+	}
+
+	if tx != nil {
+		tx.Status = spanStatusForHTTP(response.StatusCode)
+		meter := sentry.NewMeter(ctx)
+		meter.SetAttributes(
+			attribute.String("http.method", method),
+			attribute.String("http.route", input.Path),
+		)
+		statusAttr := sentry.WithAttributes(attribute.Int("http.status_code", response.StatusCode))
+		meter.Count("proxy.request", 1)
+		meter.Count("proxy.response", 1, statusAttr)
+		meter.Distribution("proxy.request.duration_ms", float64(elapsed.Milliseconds()), sentry.WithUnit(sentry.UnitMillisecond), statusAttr)
+	}
 
 	return &events.APIGatewayProxyResponse{
 		StatusCode: response.StatusCode,
@@ -151,39 +153,21 @@ func (handler *Handler) HandleRequest(ctx context.Context, input *events.APIGate
 
 func spanStatusForHTTP(status int) sentry.SpanStatus {
 	switch {
-	case status >= 200 && status < 400:
+	case status >= http.StatusOK && status < http.StatusBadRequest:
 		return sentry.SpanStatusOK
-	case status == 401:
+	case status == http.StatusUnauthorized:
 		return sentry.SpanStatusUnauthenticated
-	case status == 403:
+	case status == http.StatusForbidden:
 		return sentry.SpanStatusPermissionDenied
-	case status == 404:
+	case status == http.StatusNotFound:
 		return sentry.SpanStatusNotFound
-	case status == 429:
+	case status == http.StatusTooManyRequests:
 		return sentry.SpanStatusResourceExhausted
-	case status >= 400 && status < 500:
+	case status >= http.StatusBadRequest && status < http.StatusInternalServerError:
 		return sentry.SpanStatusInvalidArgument
 	default:
 		return sentry.SpanStatusInternalError
 	}
-}
-
-func bodyPreview(body string) string {
-	if len(body) <= 240 {
-		return body
-	}
-	return body[:240] + "…"
-}
-
-func mustJSON(value map[string]string) string {
-	if len(value) == 0 {
-		return `{}`
-	}
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return `{}`
-	}
-	return string(raw)
 }
 
 func apiResponse(status int, headers map[string]string, body any) *events.APIGatewayProxyResponse {
@@ -214,7 +198,7 @@ func buildRequestURL(req *events.APIGatewayProxyRequest) string {
 	q := ""
 	if len(req.QueryStringParameters) > 0 {
 		params := make(url.Values)
-		for k, v := range req.QueryStringParameters {
+		for k, v := range sanitizeQuery(req.QueryStringParameters) {
 			params.Set(k, v)
 		}
 		q = "?" + params.Encode()

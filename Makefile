@@ -8,7 +8,19 @@ AUTH      := $(BUILD)/authorizer
 KEEPALIVE := $(BUILD)/magic-keepalive
 NOTIFIER  := $(BUILD)/alarm-notifier
 
-.PHONY: all clean build proxy authorizer keepalive notifier zips changelog version run-local invoke-local
+.PHONY: all clean build proxy authorizer keepalive notifier zips changelog version run-local invoke-local test lint fmt vet
+
+test:
+	go test -race -shuffle=on -count=1 ./...
+
+lint:
+	golangci-lint run ./...
+
+fmt:
+	golangci-lint fmt ./...
+
+vet:
+	go vet ./...
 
 # Local emulation (AWS Lambda RIE via docker). Build for the host arch so the
 # bootstrap runs natively in the container - no qemu.

@@ -2,6 +2,7 @@ package magickeepalive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,13 +15,13 @@ const twitchTimeout = 20 * time.Second
 func NewFromEnv(ctx context.Context, getenv func(string) string) (*Refresher, error) {
 	param := getenv("MAGIC_LINK_SSM_PARAM")
 	if param == "" {
-		return nil, fmt.Errorf("MAGIC_LINK_SSM_PARAM is required")
+		return nil, errors.New("MAGIC_LINK_SSM_PARAM is required")
 	}
 
 	clientID := getenv("TWITCH_CLIENT_ID")
 	clientSecret := getenv("TWITCH_CLIENT_SECRET")
 	if clientID == "" || clientSecret == "" {
-		return nil, fmt.Errorf("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are required")
+		return nil, errors.New("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are required")
 	}
 
 	store, err := magiclink.NewStore(ctx, param)

@@ -1,15 +1,19 @@
 package proxy
 
 import (
+	"context"
+	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/foam/proxy/internal/config"
+	"github.com/foam/proxy/internal/proxy/services"
 )
 
-func TestProxyRequestsHandle(t *testing.T) {
-	proxyRequests := NewProxyRequests(&config.Proxy{
+func TestRequestsHandle(t *testing.T) {
+	proxyRequests := NewRequests(&config.Proxy{
 		DeployedBy: "tester",
 		DeployedAt: "now",
 		GitSHA:     "abc123",
@@ -75,7 +79,7 @@ func TestProxyRequestsHandle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := proxyRequests.Handle(tt.request)
+			response := proxyRequests.Handle(context.Background(), tt.request)
 			if response.StatusCode != tt.statusCode {
 				t.Fatalf("status code = %d, want %d", response.StatusCode, tt.statusCode)
 			}
@@ -91,14 +95,14 @@ func TestProxyRequestsHandle(t *testing.T) {
 	}
 }
 
-func TestProxyRequestsHandleMagic(t *testing.T) {
+func TestRequestsHandleMagic(t *testing.T) {
 	magic := &config.MagicLink{
 		AccessToken:  "ABC123",
 		RefreshToken: "REF456",
 		ExpiresIn:    14400,
 		TokenType:    "bearer",
 	}
-	proxyRequests := NewProxyRequests(&config.Proxy{
+	proxyRequests := NewRequests(&config.Proxy{
 		MagicLink:       magic,
 		MagicLinkAPIKey: "s3cret-review-key",
 	}, nil)
@@ -185,7 +189,7 @@ func TestProxyRequestsHandleMagic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := proxyRequests.Handle(&events.APIGatewayProxyRequest{
+			response := proxyRequests.Handle(context.Background(), &events.APIGatewayProxyRequest{
 				Path:                  "/api/magic",
 				QueryStringParameters: tt.query,
 			})
@@ -207,5 +211,59 @@ func TestProxyRequestsHandleMagic(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type stubTwitch struct {
+	err error
+}
+
+func (s stubTwitch) DefaultToken(context.Context) (*services.TwitchTokenResponse, error) {
+	return nil, s.err
+}
+
+func (s stubTwitch) RefreshToken(context.Context, string) (*services.TwitchRefreshTokenResponse, error) {
+	return nil, s.err
+}
+
+func TestHandleTokenAndRefreshSurfaceUpstreamFailure(t *testing.T) {
+	proxyRequests := NewRequests(&config.Proxy{}, nil)
+	proxyRequests.twitch = stubTwitch{err: errors.New("upstream down")}
+
+	token := proxyRequests.Handle(context.Background(), &events.APIGatewayProxyRequest{Path: "/api/token"})
+	if token.StatusCode != http.StatusBadGateway || !strings.Contains(token.Body, "upstream down") {
+		t.Fatalf("token response = %d %s, want 502 upstream down", token.StatusCode, token.Body)
+	}
+
+	refresh := proxyRequests.Handle(context.Background(), &events.APIGatewayProxyRequest{
+		Path:                  "/api/refresh-token",
+		QueryStringParameters: map[string]string{"token": "abc"},
+	})
+	if refresh.StatusCode != http.StatusBadGateway || !strings.Contains(refresh.Body, "upstream down") {
+		t.Fatalf("refresh response = %d %s, want 502 upstream down", refresh.StatusCode, refresh.Body)
+	}
+}
+
+func TestBuildRequestURLRedactsSecrets(t *testing.T) {
+	got := buildRequestURL(&events.APIGatewayProxyRequest{
+		Path:    "/api/refresh-token",
+		Headers: map[string]string{"Host": "auth.example"},
+		QueryStringParameters: map[string]string{
+			"token": "super-secret-token",
+			"key":   "magic-link-key",
+		},
+	})
+	if strings.Contains(got, "super-secret-token") || strings.Contains(got, "magic-link-key") {
+		t.Fatalf("url leaked secrets: %s", got)
+	}
+
+	short := buildRequestURL(&events.APIGatewayProxyRequest{
+		Path: "/api/magic",
+		QueryStringParameters: map[string]string{
+			"key": "shortkey",
+		},
+	})
+	if strings.Contains(short, "shortkey") || !strings.Contains(short, "key=%5Bredacted%5D") && !strings.Contains(short, "key=[redacted]") {
+		t.Fatalf("url leaked short key: %s", short)
 	}
 }

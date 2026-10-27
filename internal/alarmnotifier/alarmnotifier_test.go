@@ -92,7 +92,10 @@ func TestNotifyPostsBothChannels(t *testing.T) {
 	var discordHits, telegramHits atomic.Int32
 	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		discordHits.Add(1)
-		body, _ := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("ReadAll() error = %v", err)
+		}
 		if !strings.Contains(string(body), "ALARM") {
 			t.Errorf("discord body missing ALARM: %s", body)
 		}
@@ -106,7 +109,9 @@ func TestNotifyPostsBothChannels(t *testing.T) {
 			t.Errorf("unexpected telegram path %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"ok":true}`))
+		if _, err := w.Write([]byte(`{"ok":true}`)); err != nil {
+			t.Errorf("Write() error = %v", err)
+		}
 	}))
 	defer telegram.Close()
 
@@ -135,14 +140,16 @@ func TestNotifyPostsBothChannels(t *testing.T) {
 }
 
 func TestNotifyPartialFailureDoesNotError(t *testing.T) {
-	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer discord.Close()
 
-	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte("boom"))
+		if _, err := w.Write([]byte("boom")); err != nil {
+			t.Errorf("Write() error = %v", err)
+		}
 	}))
 	defer telegram.Close()
 
@@ -162,12 +169,12 @@ func TestNotifyPartialFailureDoesNotError(t *testing.T) {
 }
 
 func TestNotifyAllChannelsFail(t *testing.T) {
-	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	discord := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer discord.Close()
 
-	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	telegram := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))
 	defer telegram.Close()
@@ -187,7 +194,7 @@ func TestNotifyAllChannelsFail(t *testing.T) {
 }
 
 func TestDoJSONRejectsRedirect(t *testing.T) {
-	final := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	final := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		t.Error("should not follow redirect")
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -198,7 +205,7 @@ func TestDoJSONRejectsRedirect(t *testing.T) {
 	}))
 	defer redirect.Close()
 
-	req, err := http.NewRequest(http.MethodPost, redirect.URL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, redirect.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +217,7 @@ func TestDoJSONRejectsRedirect(t *testing.T) {
 
 func TestHandleSNS(t *testing.T) {
 	hits := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits++
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -218,11 +225,14 @@ func TestHandleSNS(t *testing.T) {
 
 	n := NewNotifier(&Config{DiscordWebhookURL: srv.URL, Environment: "staging"})
 
-	msg, _ := json.Marshal(AlarmNotification{
+	msg, err := json.Marshal(AlarmNotification{
 		AlarmName:     "foam-proxy-lambda-staging-invocations-high",
 		NewStateValue: "ALARM",
 	})
-	err := n.HandleSNS(context.Background(), events.SNSEvent{
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	err = n.HandleSNS(context.Background(), events.SNSEvent{
 		Records: []events.SNSEventRecord{{
 			SNS: events.SNSEntity{Message: string(msg)},
 		}},
@@ -237,7 +247,7 @@ func TestHandleSNS(t *testing.T) {
 
 func TestHandleSNSSkipsNonAlarmStates(t *testing.T) {
 	hits := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits++
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -247,10 +257,13 @@ func TestHandleSNSSkipsNonAlarmStates(t *testing.T) {
 
 	records := make([]events.SNSEventRecord, 0, 2)
 	for _, state := range []string{"OK", "INSUFFICIENT_DATA"} {
-		msg, _ := json.Marshal(AlarmNotification{
+		msg, err := json.Marshal(AlarmNotification{
 			AlarmName:     "foam-proxy-lambda-staging-invocations-high",
 			NewStateValue: state,
 		})
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
 		records = append(records, events.SNSEventRecord{
 			SNS: events.SNSEntity{Message: string(msg)},
 		})
