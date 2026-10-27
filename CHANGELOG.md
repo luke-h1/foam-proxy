@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 
 - **(api)** Replace invocation anomaly alarms with fixed threshold (#63)
 
+- **(api)** Deny unset API keys and jitter SSM retries (#64)
+
 
 ### Build
 
@@ -163,6 +165,8 @@ All notable changes to this project will be documented in this file.
 - **(release)** 0.3.0 [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
 
 
 ### Refactor
