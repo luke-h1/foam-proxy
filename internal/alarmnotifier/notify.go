@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -53,49 +54,46 @@ func (n *Notifier) Notify(ctx context.Context, alarm *AlarmNotification) error {
 	)
 
 	if n.cfg.HasDiscord() {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := n.sendDiscord(ctx, alarm); err != nil {
 				results <- result{name: "discord", err: err}
 				return
 			}
 			sent.Add(1)
-		}()
+		})
 	}
 
 	if n.cfg.HasTelegram() {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := n.sendTelegram(ctx, alarm); err != nil {
 				results <- result{name: "telegram", err: err}
 				return
 			}
 			sent.Add(1)
-		}()
+		})
 	}
 
 	wg.Wait()
 	close(results)
 
-	var errs []string
+	errs := []error{}
 	for r := range results {
-		errs = append(errs, fmt.Sprintf("%s: %v", r.name, r.err))
+		errs = append(errs, fmt.Errorf("%s: %w", r.name, r.err))
 	}
 
 	if len(errs) == 0 {
 		return nil
 	}
 
+	joined := errors.Join(errs...)
 	// At least one channel delivered — log the rest but do not fail the invoke,
 	// otherwise SNS/Lambda retries re-send to the channel that already succeeded.
 	if sent.Load() > 0 {
-		log.Printf("partial notify failure: %s", strings.Join(errs, "; "))
+		slog.Warn("partial notify failure", "err", joined)
 		return nil
 	}
 
-	return fmt.Errorf("notify failed: %s", strings.Join(errs, "; "))
+	return fmt.Errorf("notify failed: %w", joined)
 }
 
 func (n *Notifier) sendDiscord(ctx context.Context, alarm *AlarmNotification) error {
@@ -103,7 +101,7 @@ func (n *Notifier) sendDiscord(ctx context.Context, alarm *AlarmNotification) er
 		"content": truncate(fmt.Sprintf("CW alarm **%s** -> `%s`", alarm.AlarmName, alarm.NewStateValue), discordContentLimit),
 		"embeds": []map[string]any{
 			{
-				"title":       truncate(fmt.Sprintf("CW: %s", alarm.NewStateValue), 256),
+				"title":       truncate("CW: "+alarm.NewStateValue, 256),
 				"description": truncate(FormatPlainText(alarm, n.cfg.Environment), discordEmbedLimit),
 				"color":       discordColor(alarm.NewStateValue),
 			},
@@ -158,27 +156,30 @@ func doJSON(client *http.Client, req *http.Request) error {
 		return err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("failed to close response body: %v", err)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			slog.Warn("close response body", "err", closeErr)
 		}
 	}()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		b, readErr := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if readErr != nil {
+			return fmt.Errorf("unexpected status %d: read body: %w", resp.StatusCode, readErr)
+		}
 		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
 	return nil
 }
 
-func truncate(s string, max int) string {
-	if max <= 0 {
+func truncate(s string, limit int) string {
+	if limit <= 0 {
 		return ""
 	}
 	r := []rune(s)
-	if len(r) <= max {
+	if len(r) <= limit {
 		return s
 	}
-	if max == 1 {
+	if limit == 1 {
 		return "…"
 	}
-	return string(r[:max-1]) + "…"
+	return string(r[:limit-1]) + "…"
 }

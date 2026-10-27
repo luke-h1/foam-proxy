@@ -11,3 +11,17 @@ runs:
       uses: golangci/golangci-lint-action@v9
       with:
         version: v2.15.0
+
+    - name: Go test
+      run: go test -race -shuffle=on -count=1 ./...
+      shell: bash
+
+    - name: Check go.mod is tidy
+      run: |
+        go mod tidy
+        git diff --exit-code go.mod go.sum
+      shell: bash
+
+    - name: govulncheck
+      run: go tool govulncheck ./...
+      shell: bash

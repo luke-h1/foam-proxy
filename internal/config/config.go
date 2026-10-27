@@ -2,8 +2,8 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"errors"
+	"log/slog"
 	"os"
 	"time"
 
@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultTwitchTimeout = 20 * time.Second
+	defaultTwitchTimeout = 8 * time.Second // under the lambda's 10s timeout
 	DefaultAppScheme     = "foam"
 )
 
@@ -59,15 +59,15 @@ type Proxy struct {
 }
 
 func LoadEnv() (*Proxy, error) {
-	clientId := os.Getenv("TWITCH_CLIENT_ID")
+	clientID := os.Getenv("TWITCH_CLIENT_ID")
 	clientSecret := os.Getenv("TWITCH_CLIENT_SECRET")
 
-	if clientId == "" || clientSecret == "" {
-		return nil, fmt.Errorf("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are required")
+	if clientID == "" || clientSecret == "" {
+		return nil, errors.New("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are required")
 	}
 
 	return &Proxy{
-		TwitchClientID:     clientId,
+		TwitchClientID:     clientID,
 		TwitchClientSecret: clientSecret,
 		TwitchTimeout:      defaultTwitchTimeout,
 		DeployedBy:         os.Getenv("DEPLOYED_BY"),
@@ -88,16 +88,20 @@ func ParseMagicLink(raw string) *MagicLink {
 
 	var magic MagicLink
 	if err := json.Unmarshal([]byte(raw), &magic); err != nil {
-		log.Printf("failed to parse magic link blob: %v", err)
+		slog.Error("parse magic link blob", "err", err)
 		return nil
 	}
 
 	if magic.AccessToken == "" || magic.RefreshToken == "" {
-		log.Print("magic link blob missing tokens; magic link disabled")
+		slog.Warn("magic link blob missing tokens; magic link disabled")
 		return nil
 	}
 
 	return &magic
+}
+
+func InitLogger() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 }
 
 func InitSentry(dsnEnvVar string) {
@@ -106,7 +110,7 @@ func InitSentry(dsnEnvVar string) {
 		return
 	}
 	if err := sentry.Init(SentryOptions(dsn)); err != nil {
-		log.Printf("sentry init: %v", err)
+		slog.Error("sentry init", "err", err)
 	}
 }
 

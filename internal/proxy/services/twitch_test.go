@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,14 +20,16 @@ func TestRefreshTokenSendsFormEncodedRequest(t *testing.T) {
 		gotClientID = r.PostForm.Get("client_id")
 		gotClientSecret = r.PostForm.Get("client_secret")
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"access_token":"NEW","refresh_token":"NEWREF","expires_in":14033,"token_type":"bearer"}`))
+		if _, err := w.Write([]byte(`{"access_token":"NEW","refresh_token":"NEWREF","expires_in":14033,"token_type":"bearer"}`)); err != nil {
+			t.Errorf("Write() error = %v", err)
+		}
 	}))
 	defer srv.Close()
 
 	svc := NewTwitchService("client-id", "client-secret", time.Second)
 	svc.baseURL = srv.URL
 
-	out, err := svc.RefreshToken("the-refresh-token")
+	out, err := svc.RefreshToken(context.Background(), "the-refresh-token")
 	if err != nil {
 		t.Fatalf("RefreshToken() error = %v", err)
 	}
@@ -53,14 +56,16 @@ func TestRefreshTokenSendsFormEncodedRequest(t *testing.T) {
 func TestRefreshTokenReturnsUpstreamErrorOnBadStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"status":400,"message":"Invalid refresh token"}`))
+		if _, err := w.Write([]byte(`{"status":400,"message":"Invalid refresh token"}`)); err != nil {
+			t.Errorf("Write() error = %v", err)
+		}
 	}))
 	defer srv.Close()
 
 	svc := NewTwitchService("client-id", "client-secret", time.Second)
 	svc.baseURL = srv.URL
 
-	_, err := svc.RefreshToken("dead-token")
+	_, err := svc.RefreshToken(context.Background(), "dead-token")
 	if err == nil {
 		t.Fatal("expected error on 400 response")
 	}
@@ -73,5 +78,39 @@ func TestNewTwitchServiceUsesProvidedTimeout(t *testing.T) {
 	svc := NewTwitchService("id", "secret", 7*time.Second)
 	if svc.httpClient.Timeout != 7*time.Second {
 		t.Errorf("httpClient.Timeout = %v, want 7s", svc.httpClient.Timeout)
+	}
+
+	zero := NewTwitchService("id", "secret", 0)
+	if zero.httpClient.Timeout != defaultTimeout {
+		t.Errorf("zero timeout = %v, want %v", zero.httpClient.Timeout, defaultTimeout)
+	}
+}
+
+func TestDefaultTokenHonorsContext(t *testing.T) {
+	unblock := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+		case <-unblock:
+		}
+	}))
+	t.Cleanup(func() {
+		close(unblock)
+		srv.Close()
+	})
+
+	svc := NewTwitchService("client-id", "client-secret", 5*time.Second)
+	svc.baseURL = srv.URL
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := svc.DefaultToken(ctx)
+	if err == nil {
+		t.Fatal("expected context cancellation")
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("DefaultToken returned in %s; request context was not honored", time.Since(start))
 	}
 }

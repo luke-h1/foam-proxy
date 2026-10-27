@@ -2,8 +2,9 @@ package alarmnotifier
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -11,34 +12,31 @@ import (
 
 func (n *Notifier) HandleSNS(ctx context.Context, event events.SNSEvent) error {
 	if len(event.Records) == 0 {
-		return fmt.Errorf("sns event has no records")
+		return errors.New("sns event has no records")
 	}
 
-	var firstError error
-
+	errs := []error{}
 	for _, record := range event.Records {
 		alarm, err := ParseAlarmMessage(record.SNS.Message)
 		if err != nil {
-			log.Printf("skipping sns record: %v", err)
-			if firstError == nil {
-				firstError = err
-			}
+			errs = append(errs, fmt.Errorf("parse sns record: %w", err))
 			continue
 		}
-		log.Printf("alarm received %s -> %s for reason -> %s", alarm.AlarmName, alarm.NewStateValue, alarm.NewStateReason)
+		slog.Info("alarm received",
+			"alarm", alarm.AlarmName,
+			"state", alarm.NewStateValue,
+			"reason", alarm.NewStateReason,
+		)
 
 		// only notify on abnormal transitions; skip recoveries (OK) and INSUFFICIENT_DATA
 		if !strings.EqualFold(alarm.NewStateValue, "ALARM") {
-			log.Printf("skipping non-alarm state %s for %s", alarm.NewStateValue, alarm.AlarmName)
+			slog.Info("skipping non-alarm state", "alarm", alarm.AlarmName, "state", alarm.NewStateValue)
 			continue
 		}
 
 		if err := n.Notify(ctx, alarm); err != nil {
-			log.Printf("Notification failed for %s: %v", alarm.AlarmName, err)
-			if firstError == nil {
-				firstError = err
-			}
+			errs = append(errs, fmt.Errorf("notify %s: %w", alarm.AlarmName, err))
 		}
 	}
-	return firstError
+	return errors.Join(errs...)
 }

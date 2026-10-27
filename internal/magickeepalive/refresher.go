@@ -1,8 +1,6 @@
 // Package magickeepalive keeps the App Review magic-link token alive. It reads the
-// current token blob from the canonical store, exchanges its refresh token for a
-// fresh access token at Twitch, and writes the rotated blob back — the work the
-// old refresh-magic-link GitHub workflow did, now runnable from a scheduled
-// Lambda.
+// current token blob from the store, exchanges its refresh token for a
+// fresh access token at Twitch, and writes the rotated blob back
 package magickeepalive
 
 import (
@@ -15,9 +13,7 @@ import (
 	"github.com/foam/proxy/internal/proxy/services"
 )
 
-// ErrTokenRotated marks a failure after Twitch rotated the refresh token but
-// before the new blob persisted. The old token is dead, so retrying is futile.
-var ErrTokenRotated = errors.New("token rotated but blob not persisted")
+var ErrTokenRotated = errors.New("magickeepalive: token rotated but blob not persisted")
 
 type blobStore interface {
 	Get(ctx context.Context) (string, error)
@@ -25,7 +21,7 @@ type blobStore interface {
 }
 
 type twitchRefresher interface {
-	RefreshToken(token string) (*services.TwitchRefreshTokenResponse, error)
+	RefreshToken(ctx context.Context, token string) (*services.TwitchRefreshTokenResponse, error)
 }
 
 type Refresher struct {
@@ -37,9 +33,6 @@ func New(store blobStore, twitch twitchRefresher) *Refresher {
 	return &Refresher{store: store, twitch: twitch}
 }
 
-// Refresh rotates the stored token. Twitch rotates the refresh token on use, so
-// the old one dies immediately; persisting the new blob is mandatory, and any
-// failure leaves the existing blob untouched.
 func (r *Refresher) Refresh(ctx context.Context) error {
 	raw, err := r.store.Get(ctx)
 	if err != nil {
@@ -47,24 +40,25 @@ func (r *Refresher) Refresh(ctx context.Context) error {
 	}
 
 	current := config.ParseMagicLink(raw)
+
 	if current == nil || current.RefreshToken == "" {
-		return fmt.Errorf("stored blob has no refresh token")
+		return errors.New("stored blob has no refresh token")
 	}
 
-	resp, err := r.twitch.RefreshToken(current.RefreshToken)
+	resp, err := r.twitch.RefreshToken(ctx, current.RefreshToken)
 	if err != nil {
 		return fmt.Errorf("twitch refresh: %w", err)
 	}
+
 	if resp == nil {
-		return fmt.Errorf("twitch refresh returned no response")
+		return errors.New("twitch refresh returned no response")
 	}
+
 	if resp.AccessToken == "" {
-		return fmt.Errorf("twitch refresh returned no access token")
+		return errors.New("twitch refresh returned no access token")
 	}
-	// Empty means Twitch rotated the old token away; carrying it forward would
-	// persist a dead token.
 	if resp.RefreshToken == "" {
-		return fmt.Errorf("twitch refresh returned no refresh token")
+		return errors.New("twitch refresh returned no refresh token")
 	}
 
 	next := config.MagicLink{
@@ -78,7 +72,7 @@ func (r *Refresher) Refresh(ctx context.Context) error {
 		next.TokenType = current.TokenType
 	}
 
-	blob, err := json.Marshal(next)
+	blob, err := json.Marshal(next) //nolint:gosec // G117: persisting the rotated token is what this write is for
 	if err != nil {
 		return fmt.Errorf("marshal blob: %w", err)
 	}

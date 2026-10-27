@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/url"
 	"strconv"
 
@@ -22,10 +23,10 @@ func DefaultHeaders() map[string]string {
 	}
 }
 
-func (p *ProxyRequests) jsonResponse(statusCode int, body interface{}) Response {
+func (p *Requests) jsonResponse(statusCode int, body any) Response {
 	raw, err := json.Marshal(body)
 	if err != nil {
-		statusCode = 500
+		statusCode = http.StatusInternalServerError
 		raw = []byte(`{"error":"internal server error"}`)
 	}
 	return Response{
@@ -57,8 +58,8 @@ func magicTokenType(magic *config.MagicLink) string {
 	return magic.TokenType
 }
 
-func magicTokenBlob(magic *config.MagicLink) map[string]interface{} {
-	blob := map[string]interface{}{
+func magicTokenBlob(magic *config.MagicLink) map[string]any {
+	blob := map[string]any{
 		"access_token": magic.AccessToken,
 		"token_type":   magicTokenType(magic),
 	}

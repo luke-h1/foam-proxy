@@ -1,22 +1,22 @@
 // Package magiclink stores the App Review magic-link token blob in SSM Parameter
-// Store (SecureString). It is the canonical store both the proxy (read) and the
+// Store (SecureString). It is the store both the proxy (read) and the
 // magic-keepalive Lambda (read + write) share, replacing the GitHub-secret
-// write-back the old refresh workflow relied on. SSM survives terraform applies
-// (the parameter is seeded with ignore_changes on its value), so a deploy never
-// reverts a rotated token.
+// write-back the old refresh workflow relied on.
 package magiclink
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/aws/smithy-go"
 
 	"github.com/foam/proxy/internal/config"
 )
@@ -24,6 +24,7 @@ import (
 const (
 	retryAttempts = 3
 	retryBaseWait = 200 * time.Millisecond
+	retryMaxWait  = time.Second
 )
 
 type ssmClient interface {
@@ -39,9 +40,14 @@ type Store struct {
 func NewStore(ctx context.Context, param string) (*Store, error) {
 	cfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("magiclink: load aws config: %w", err)
 	}
-	return &Store{client: ssm.NewFromConfig(cfg), param: param}, nil
+	client := ssm.NewFromConfig(cfg, func(o *ssm.Options) {
+		o.Retryer = retry.NewStandard(func(so *retry.StandardOptions) {
+			so.MaxAttempts = 1
+		})
+	})
+	return &Store{client: client, param: param}, nil
 }
 
 func (s *Store) Get(ctx context.Context) (string, error) {
@@ -52,14 +58,17 @@ func (s *Store) Get(ctx context.Context) (string, error) {
 		})
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("magiclink: get parameter: %w", err)
+	}
+	if out == nil || out.Parameter == nil {
+		return "", errors.New("magiclink: empty parameter response")
 	}
 	return aws.ToString(out.Parameter.Value), nil
 }
 
 func (s *Store) Put(ctx context.Context, value string) error {
 	if config.ParseMagicLink(value) == nil {
-		return fmt.Errorf("magiclink: refusing to store malformed blob")
+		return errors.New("magiclink: refusing to store malformed blob")
 	}
 
 	_, err := withRetry(ctx, func() (*ssm.PutParameterOutput, error) {
@@ -70,20 +79,20 @@ func (s *Store) Put(ctx context.Context, value string) error {
 			Overwrite: aws.Bool(true),
 		})
 	})
-	return err
-}
-
-// permanentSSMErrors are hard failures retrying can never fix.
-var permanentSSMErrors = map[string]bool{
-	"AccessDeniedException": true,
-	"ParameterNotFound":     true,
-	"ValidationException":   true,
+	if err != nil {
+		return fmt.Errorf("magiclink: put parameter: %w", err)
+	}
+	return nil
 }
 
 func isRetryable(err error) bool {
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		return !permanentSSMErrors[apiErr.ErrorCode()]
+	var accessDenied *types.AccessDeniedException
+	var notFound *types.ParameterNotFound
+	var validation *types.ValidationException
+	var invalidKey *types.InvalidKeyId
+	var versionLimit *types.ParameterMaxVersionLimitExceeded
+	if errors.As(err, &accessDenied) || errors.As(err, &notFound) || errors.As(err, &validation) || errors.As(err, &invalidKey) || errors.As(err, &versionLimit) {
+		return false
 	}
 	return true
 }
@@ -101,11 +110,43 @@ func withRetry[T any](ctx context.Context, fn func() (T, error)) (T, error) {
 		if !isRetryable(err) || attempt == retryAttempts {
 			break
 		}
-		select {
-		case <-ctx.Done():
-			return result, ctx.Err()
-		case <-time.After(retryBaseWait * time.Duration(attempt)):
+		if ctx.Err() != nil {
+			return result, errors.Join(err, ctx.Err())
+		}
+		if waitErr := waitBackoff(ctx, backoffDelay(attempt)); waitErr != nil {
+			return result, errors.Join(err, waitErr)
 		}
 	}
 	return result, err
+}
+
+func backoffCeiling(attempt int) time.Duration {
+	ceiling := retryBaseWait << (attempt - 1)
+	if ceiling > retryMaxWait {
+		return retryMaxWait
+	}
+	return ceiling
+}
+
+func backoffDelay(attempt int) time.Duration {
+	ceiling := backoffCeiling(attempt)
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(ceiling)))
+	if err != nil {
+		return ceiling / 2
+	}
+	return time.Duration(n.Int64())
+}
+
+func waitBackoff(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }

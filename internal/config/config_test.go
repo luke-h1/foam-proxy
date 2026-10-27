@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 )
@@ -52,6 +53,19 @@ func TestSentryOptionsCarriesReleaseTagsAndMetrics(t *testing.T) {
 	}
 	if _, ok := opts.Tags["deployed_at"]; ok {
 		t.Fatalf("empty env vars should be omitted from tags, got %v", opts.Tags)
+	}
+}
+
+func TestLoadEnvTwitchTimeoutFitsProxyLambda(t *testing.T) {
+	t.Setenv("TWITCH_CLIENT_ID", "id")
+	t.Setenv("TWITCH_CLIENT_SECRET", "secret")
+
+	cfg, err := LoadEnv()
+	if err != nil {
+		t.Fatalf("LoadEnv() error = %v", err)
+	}
+	if cfg.TwitchTimeout != 8*time.Second {
+		t.Fatalf("TwitchTimeout = %s, want 8s", cfg.TwitchTimeout)
 	}
 }
 

@@ -6,18 +6,17 @@ import (
 	"time"
 
 	"github.com/foam/proxy/internal/config"
+	"golang.org/x/sync/singleflight"
 )
 
-// magicLinkSource reads the raw token blob JSON from the canonical store (SSM).
 type magicLinkSource interface {
 	Get(ctx context.Context) (string, error)
 }
 
 const (
-	magicCacheTTL = 60 * time.Second
-	// magicCacheErrorTTL is the negative-cache window after a failed SSM
-	// read/parse, so a sustained outage doesn't hit SSM on every request.
+	magicCacheTTL      = 60 * time.Second
 	magicCacheErrorTTL = 5 * time.Second
+	magicFetchTimeout  = 1500 * time.Millisecond
 )
 
 type magicLinkCache struct {
@@ -27,6 +26,7 @@ type magicLinkCache struct {
 	mu     sync.Mutex
 	cached *config.MagicLink
 	exp    time.Time
+	flight singleflight.Group
 }
 
 func newMagicLinkCache(source magicLinkSource, envLink *config.MagicLink) *magicLinkCache {
@@ -36,25 +36,59 @@ func newMagicLinkCache(source magicLinkSource, envLink *config.MagicLink) *magic
 // Resolve returns the current token blob, reading SSM (cached) when a store is
 // configured and otherwise falling back to the env-var blob. A transient SSM
 // error also falls back to the env blob rather than breaking the review login.
-func (c *magicLinkCache) Resolve() *config.MagicLink {
+func (c *magicLinkCache) Resolve(ctx context.Context) *config.MagicLink {
 	if c.source == nil {
 		return c.envLink
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.exp.IsZero() && time.Now().Before(c.exp) {
-		if c.cached != nil {
-			return c.cached
-		}
-		// inside a negative-cache window with nothing fetched yet
-		return c.envLink
+	if link, ok := c.fresh(); ok {
+		return link
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	v, _, _ := c.flight.Do("magic", func() (any, error) {
+		if link, ok := c.fresh(); ok {
+			return link, nil
+		}
+		return c.load(ctx), nil
+	})
+
+	link, ok := v.(*config.MagicLink)
+	if !ok {
+		return c.envLink
+	}
+	return link
+}
+
+func (c *magicLinkCache) fresh() (*config.MagicLink, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.exp.IsZero() || !time.Now().Before(c.exp) {
+		return nil, false
+	}
+	if c.cached != nil {
+		return c.cached, true
+	}
+	return c.envLink, true
+}
+
+func (c *magicLinkCache) load(ctx context.Context) *config.MagicLink {
+	fetchCtx, cancel := context.WithTimeout(ctx, magicFetchTimeout)
 	defer cancel()
-	raw, err := c.source.Get(ctx)
+
+	raw, err := c.source.Get(fetchCtx)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if err != nil {
+		// cancelled request should not mutate the cache
+		if ctx.Err() != nil {
+			if c.cached != nil {
+				return c.cached
+			}
+			return c.envLink
+		}
 		safeLog("[AUTHDBG] magic link SSM read failed", map[string]string{"error": err.Error()})
 		c.exp = time.Now().Add(magicCacheErrorTTL)
 		if c.cached != nil {

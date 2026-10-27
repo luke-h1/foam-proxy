@@ -2,6 +2,7 @@ package alarmnotifier
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -21,11 +22,11 @@ func ParseAlarmMessage(raw string) (*AlarmNotification, error) {
 	var alarm AlarmNotification
 
 	if err := json.Unmarshal([]byte(raw), &alarm); err != nil {
-		return nil, fmt.Errorf("failed to parse CW alarm message: %w", err)
+		return nil, fmt.Errorf("parse cloudwatch alarm: %w", err)
 	}
 
 	if alarm.AlarmName == "" {
-		return nil, fmt.Errorf("CW alarm message missing required field AlarmName")
+		return nil, errors.New("cloudwatch alarm message missing alarm name")
 	}
 	return &alarm, nil
 }

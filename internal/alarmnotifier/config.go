@@ -1,7 +1,7 @@
 package alarmnotifier
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"strings"
 )
@@ -26,10 +26,10 @@ func LoadConfig() (*Config, error) {
 	}
 
 	if (cfg.TelegramBotToken == "") != (cfg.TelegramChatID == "") {
-		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must both be set or both empty")
+		return nil, errors.New("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must both be set or both empty")
 	}
 	if !cfg.HasDiscord() && !cfg.HasTelegram() {
-		return nil, fmt.Errorf("at least one of DISCORD_WEBHOOK_URL or TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID is required")
+		return nil, errors.New("at least one of DISCORD_WEBHOOK_URL or TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID is required")
 	}
 
 	return cfg, nil

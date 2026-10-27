@@ -31,7 +31,7 @@ type fakeTwitch struct {
 	gotToken string
 }
 
-func (f *fakeTwitch) RefreshToken(token string) (*services.TwitchRefreshTokenResponse, error) {
+func (f *fakeTwitch) RefreshToken(_ context.Context, token string) (*services.TwitchRefreshTokenResponse, error) {
 	f.gotToken = token
 	return f.resp, f.err
 }
