@@ -36,14 +36,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
 
       - name: Load secrets
         id: load_secrets
-        uses: 1password/load-secrets-action@v3
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:
