@@ -18,10 +18,10 @@ runs:
       run: if [ "${{ inputs.environment }}" != "staging" ] && [ "${{ inputs.environment }}" != "production" ]; then echo "Invalid environment"; exit 1; fi
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v4
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v3
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         aws-access-key-id: ${{ inputs.aws-key-id }}
         aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
@@ -29,7 +29,7 @@ runs:
         mask-aws-account-id: true
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v4
 
     - name: Build lambdas
       uses: ./.github/actions/build
