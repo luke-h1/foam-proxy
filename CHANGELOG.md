@@ -176,6 +176,8 @@ All notable changes to this project will be documented in this file.
 
 - **(deps)** Bump the actions group across 5 directories with 6 updates (#67)
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
