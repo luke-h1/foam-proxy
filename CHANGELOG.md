@@ -28,6 +28,8 @@ All notable changes to this project will be documented in this file.
 
 - Pull sentry DSNs from 1password (#56)
 
+- Skip secret-dependent jobs on dependabot PRs (#68)
+
 
 ### Features
 
@@ -169,6 +171,10 @@ All notable changes to this project will be documented in this file.
 - **(release)** 0.3.0 [skip ci]
 
 - Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(deps)** Bump the actions group across 5 directories with 6 updates (#67)
 
 
 ### Refactor
