@@ -21,10 +21,10 @@ runs:
       uses: ./.github/actions/build
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v4
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v3
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         aws-access-key-id: ${{ inputs.aws-key-id }}
         aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
@@ -32,7 +32,7 @@ runs:
         mask-aws-account-id: true
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v4
 
     - name: Terraform init
       working-directory: terraform
