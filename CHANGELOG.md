@@ -184,6 +184,8 @@ All notable changes to this project will be documented in this file.
 
 - **(ci)** Move workflows to self-hosted runner (#71)
 
+- Update changelog [skip ci]
+
 
 ### Refactor
 
