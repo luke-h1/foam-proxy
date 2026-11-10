@@ -4,10 +4,12 @@ runs:
   using: composite
   steps:
     - name: Install moreutils
+      if: runner.os == 'Linux'
       run: sudo apt install -y moreutils
       shell: bash
 
     - name: Tune Linux network
+      if: runner.os == 'Linux'
       run: sudo ethtool -K eth0 tx off rx off
       shell: bash
 

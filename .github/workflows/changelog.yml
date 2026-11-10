@@ -10,7 +10,7 @@ permissions:
 jobs:
   changelog:
     name: Generate changelog
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-latest' }}
     outputs:
       content: ${{ steps.git-cliff.outputs.content }}
       version: ${{ steps.git-cliff.outputs.version }}
@@ -23,14 +23,19 @@ jobs:
 
       - name: Install git-cliff
         run: |
-          ARCH=$(uname -m)
-          [ "$ARCH" = "x86_64" ] && ARCH=x86_64 || true
-          [ "$ARCH" = "aarch64" ] && ARCH=aarch64 || true
-          TAG=$(curl -sSf https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r .tag_name)
-          URL="https://github.com/orhun/git-cliff/releases/download/${TAG}/git-cliff-${TAG#v}-${ARCH}-unknown-linux-gnu.tar.gz"
-          curl -sSfL "$URL" | tar xz
-          mv git-cliff-*/git-cliff ./git-cliff
-          chmod +x ./git-cliff
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install git-cliff
+            ln -sf "$(command -v git-cliff)" ./git-cliff
+          else
+            ARCH=$(uname -m)
+            [ "$ARCH" = "x86_64" ] && ARCH=x86_64 || true
+            [ "$ARCH" = "aarch64" ] && ARCH=aarch64 || true
+            TAG=$(curl -sSf https://api.github.com/repos/orhun/git-cliff/releases/latest | jq -r .tag_name)
+            URL="https://github.com/orhun/git-cliff/releases/download/${TAG}/git-cliff-${TAG#v}-${ARCH}-unknown-linux-gnu.tar.gz"
+            curl -sSfL "$URL" | tar xz
+            mv git-cliff-*/git-cliff ./git-cliff
+            chmod +x ./git-cliff
+          fi
           echo "$PWD" >> $GITHUB_PATH
           echo "GIT_CLIFF_BIN=$PWD/git-cliff" >> $GITHUB_ENV
 
@@ -55,7 +60,7 @@ jobs:
   commit-changelog:
     name: Commit CHANGELOG
     needs: changelog
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-latest' }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
