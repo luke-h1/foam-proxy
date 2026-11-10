@@ -10,7 +10,7 @@ permissions:
 jobs:
   changelog:
     name: Generate changelog
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-latest' }}
     outputs:
       content: ${{ steps.git-cliff.outputs.content }}
       version: ${{ steps.git-cliff.outputs.version }}
@@ -55,7 +55,7 @@ jobs:
   commit-changelog:
     name: Commit CHANGELOG
     needs: changelog
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-latest' }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
