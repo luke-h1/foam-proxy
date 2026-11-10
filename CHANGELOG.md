@@ -180,6 +180,10 @@ All notable changes to this project will be documented in this file.
 
 - **(release)** 0.3.0 [skip ci]
 
+- **(release)** 0.3.0 [skip ci]
+
+- **(ci)** Move workflows to self-hosted runner (#71)
+
 
 ### Refactor
 
