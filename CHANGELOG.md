@@ -5,3 +5,441 @@
 ### Fixed
 
 - The Lambdas build with Go 1.27.4, which closes GO-2026-6859 in net/http.
+
+## Before changesets
+
+These are the commit subjects that git-cliff rendered after 0.2.1. Releases from here on are changesets.
+
+### Bug Fixes
+
+- **(infrastructure)** Strip v
+
+- **(proxy)** Implicit code redirect
+
+- **(proxy)** Implicit code redirect
+
+- **(api)** Magic link marshal (#52)
+
+- **(infrastructure)** No teardown on push
+
+- **(api)** Resolve invalid refresh token sentry err
+
+- **(api)** Require 3 of 5 datapoints for invocation anomaly alarms (#60)
+
+- **(api)** Replace invocation anomaly alarms with fixed threshold (#63)
+
+- **(api)** Deny unset API keys and jitter SSM retries (#64)
+
+
+### Build
+
+- Pull sentry DSNs from 1password (#56)
+
+- Skip secret-dependent jobs on dependabot PRs (#68)
+
+
+### Features
+
+- **(api)** Add magic link support (#50)
+
+- **(api)** Ssm based keepalive (#51)
+
+- Cloudflare WAF edge rate limits (#57)
+
+- **(api)** Add sns alarms (#58)
+
+
+### Miscellaneous
+
+- **(release)** Vvv0.2.1 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- **(lambda)** Unify sentry opts (#44)
+
+- Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- **(lambda)** Update go version (#47)
+
+- Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- **(api)** Swap staging for prod tokens
+
+- **(api)** Swap staging for prod tokens
+
+- Update changelog [skip ci]
+
+- **(release)** 0.2.2 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(docs)** Get rid of ai generated readme
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(docs)** Update readme on keep-alive
+
+- Update changelog [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(api)** Add local lambda for dx (#53)
+
+- Update changelog [skip ci]
+
+- **(docs)** Add bsd-3 license
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(api)** Tidy up internal (#54)
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(api)** Move sentry org (#55)
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(api)** Update go to 1.27.0 (#62)
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(deps)** Bump the actions group across 5 directories with 6 updates (#67)
+
+- Update changelog [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(release)** 0.3.0 [skip ci]
+
+- **(ci)** Move workflows to self-hosted runner (#71)
+
+- Update changelog [skip ci]
+
+- Update changelog [skip ci]
+
+
+### Refactor
+
+- **(api)** Consolidate proxy module
+
+## [0.2.1] - 2026-03-03
+
+### Bug Fixes
+
+- **(infrastructure)** Strip v
+
+
+### Miscellaneous
+
+- **(release)** Vvv0.2.0 [skip ci]
+
+- Update changelog [skip ci]
+
+## [0.2.0] - 2026-03-03
+
+### Features
+
+- **(proxy)** Move refresh token to lambda (#43)
+
+
+### Miscellaneous
+
+- **(release)** Vv0.1.1 [skip ci]
+
+- Update changelog [skip ci]
+
+## [0.1.1] - 2026-03-02
+
+### Miscellaneous
+
+- **(release)** V0.1.0 [skip ci]
+
+- **(lambda)** Health metrics
+
+- Update changelog [skip ci]
+
+## [0.1.0] - 2026-03-02
+
+### Bug Fixes
+
+- **(infrastructure)** Fix prettier
+
+- **(infra)** Add destroy workflow for wrong env being deployed
+
+- **(infra)** Fix destroy workflow
+
+- **(infra)** Add missing build cmd
+
+- **(infra)** Step one dir out
+
+- **(infra)** Fix exec role
+
+- **(infra)** Enable cloudwatch for debugging
+
+- **(infra)** Add api key to secrets
+
+- **(proxy)** Send body back to avoid integration errors
+
+- **(infra)** Add api key to destroy workflow
+
+- **(infra)** Fix destroy workflow
+
+- **(infra)** Destroy staging workflow
+
+- **(infra)** Fix domain name
+
+- **(infra)** Update domain name
+
+- **(infra)** Fix domain part
+
+- **(infra)** Fix domain part
+
+- **(proxy)** Alter redirect uri
+
+- **(proxy)** Alter redirect uri
+
+- **(proxy)** Alter redirect uri
+
+- **(proxy)** Alter redirect uri
+
+- **(proxy)** Alter redirect uri
+
+- **(proxy)** Alter redirect uri
+
+- **(proxy)** Add pending
+
+- **(proxy)** Add pending
+
+- **(proxy)** Add pending
+
+- **(proxy)** Fix pathing
+
+- **(proxy)** Fix pathing
+
+- **(proxy)** Fix pathing
+
+- **(proxy)** Fix pathing
+
+- **(proxy)** Fix pathing
+
+- **(lambda)** Add healthcheck endpoint
+
+- **(lambda)** Add healthcheck
+
+- **(lambda)** Fix routing
+
+- **(api)** Fix version endpoint
+
+- **(infra)** Fix
+
+- **(infrastructure)** Fix gw
+
+- **(infrastructure)** Add env vars to lambda
+
+- **(infrastructure)** Fix api key not set
+
+- **(infrastructure)** Fix api key not set
+
+- **(infrastructure)** Fix api key not set
+
+- **(lambda)** Fix api key not set
+
+- **(lambda)** Fix api key not set
+
+- **(lambda)** Fix api key not set
+
+- **(lambda)** Fix api key not set
+
+- **(lambda)** Fix api key not set
+
+- **(authorizer)** Protect with api key
+
+- **(authorizer)** Protect with api key
+
+- **(authorizer)** Protect with api key
+
+- **(authorizer)** Protect with api key
+
+- **(authorizer)** Protect with api key
+
+- **(authorizer)** Protect with api key
+
+- **(authorizer)** Protect with api key
+
+- **(infrastructure)** Deploy to production
+
+- Dynamodb billing
+
+- **(lambda)** Fix ci (#42)
+
+
+### Features
+
+- **(proxy)** Setup project
+
+- **(proxy)** Setup basic lambda
+
+- **(proxy)** Protect API with api key
+
+- **(proxy)** Add proxying logic
+
+- **(proxy)** Iac setup
+
+- **(infra)** Deploy to staging
+
+- **(infra)** Prepare for staging deploy
+
+- **(infra)** Prepare for staging deploy
+
+- **(lambda)** Add pending route
+
+- **(lambda)** Add version endpoint
+
+- **(lambda)** Add version endpoint
+
+- **(lambda)** Add version routing
+
+- **(lambda)** Add version routing
+
+- **(lambda)** Add version routing
+
+- **(lambda)** Add token endpoint
+
+- **(lambda)** Add authorizer
+
+- **(lambda)** Add authorizer
+
+- **(lambda)** Add authorizer
+
+- **(infrastructure)** Production lambda infrastructure
+
+- **(infrastructure)** Production lambda infrastructure
+
+- **(api)** Add sentry monitoring
+
+- **(api)** Add sentry monitoring
+
+- **(api)** Add sentry monitoring
+
+- **(lambda)** Sentry monitoring (#31)
+
+- **(infrastructure)** Move secrets to 1p (#34)
+
+- **(infrastructure)** Move secrets to 1p (#35)
+
+- **(lambda)** Move to go
+
+
+### Miscellaneous
+
+- **(infra)** Debug lambda
+
+- **(lambda)** Test routing
+
+- **(lambda)** Test routing
+
+- **(refactor)** Refactor routing
+
+- **(lambda)** Fix build
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Debug lambda
+
+- **(lambda)** Enhance sentry (#33)
+
+- **(lambda)** Update deps (#39)
+
+- Update changelog [skip ci]
+
+- Update changelog [skip ci]
