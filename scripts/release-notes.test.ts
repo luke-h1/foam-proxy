@@ -90,9 +90,20 @@ describe('release', () => {
     const out = run(dir, 'release', '--version', '0.4.0', '--date', '2026-11-17');
     const changelog = readFileSync(join(dir, 'CHANGELOG.md'), 'utf8');
     expect(changelog).toBe(released);
-    expect(out.trim()).toBe(changelog.slice(changelog.indexOf('## 0.4.0')).trim());
+    expect(out).toBe(
+      '### New\n\n- A new route lists the versions.\n\n### Fixed\n\n- The healthcheck answers faster.\n',
+    );
     expect(existsSync(join(dir, '.changeset', 'one.md'))).toBe(false);
     expect(existsSync(join(dir, '.changeset', 'two.md'))).toBe(false);
+  });
+
+  test('refuses an option token as a flag value and touches nothing', () => {
+    const dir = repo({ one: fixed });
+    const result = spawn(dir, 'release', '--version', '--date', '2026-11-17');
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.trim()).toBe('--version needs a value');
+    expect(readFileSync(join(dir, 'CHANGELOG.md'), 'utf8')).toBe('# Changelog\n');
+    expect(existsSync(join(dir, '.changeset', 'one.md'))).toBe(true);
   });
 
   test('appends a second block of headings to an existing section', () => {
