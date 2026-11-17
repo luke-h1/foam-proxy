@@ -117,7 +117,7 @@ jobs:
             exit 0
           fi
           LATEST_VERSION="$(printf '%s' "$LATEST_LINE" | cut -f1)"
-          LATEST_TAG="${LATEST_LINE#*	}"
+          LATEST_TAG="$(printf '%s' "$LATEST_LINE" | cut -f2)"
           if git tag -l "$LATEST_VERSION" | grep -qx "$LATEST_VERSION"; then
             LATEST_TAG="$LATEST_VERSION"
           fi
