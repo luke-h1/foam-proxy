@@ -107,11 +107,27 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Publish a release the last run did not finish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          LATEST="$(git tag -l | sed 's/^v*//' | { grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1)"
+          if [ -z "$LATEST" ] || gh release view "$LATEST" >/dev/null 2>&1; then
+            exit 0
+          fi
+          if ! bun scripts/release-notes.ts show --version "$LATEST" > "$RUNNER_TEMP/latest-notes.md"; then
+            echo "CHANGELOG.md has no section for ${LATEST}; nothing to publish"
+            exit 0
+          fi
+          echo "Publishing the release for ${LATEST} that an earlier run tagged but did not create"
+          gh release create "$LATEST" --title "$LATEST" --notes-file "$RUNNER_TEMP/latest-notes.md"
+
       - name: Resolve the next version
         id: version
         run: |
           set -euo pipefail
-          CURRENT="$(git tag -l | sed 's/^v*//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+          CURRENT="$(git tag -l | sed 's/^v*//' | { grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1)"
           CURRENT="${CURRENT:-0.0.0}"
           NEXT="$(bun scripts/release-notes.ts next-version --current "$CURRENT")"
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
@@ -135,5 +151,5 @@ jobs:
           git add CHANGELOG.md .changeset
           git commit -m "chore(changelog): release ${NEXT} [skip ci]"
           git tag -a "$NEXT" -m "Release ${NEXT}"
-          git push origin main "$NEXT"
+          git push --atomic origin main "$NEXT"
           gh release create "$NEXT" --title "$NEXT" --notes-file "$RUNNER_TEMP/release-notes.md"
