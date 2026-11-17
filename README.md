@@ -6,7 +6,7 @@ Lambda which supports authentication proxying for [foam](https://github.com/luke
 
 - [AWS Lambda](https://aws.amazon.com/lambda/)
 - [Terraform](https://www.terraform.io/)
-- [git-cliff](https://github.com/orhun/git-cliff) for changelog and version bumps
+- [Changesets](https://github.com/changesets/changesets) for release notes and versions
 
 
 ## Run locally
@@ -36,9 +36,24 @@ make CMD=authorizer invoke-local EVENT=events/authorizer.json
 For pure logic changes the tests are the faster loop:
 `TWITCH_CLIENT_ID=x TWITCH_CLIENT_SECRET=y go test ./...`
 
-## Changelog & version
+## Changelog and version
 
-Changelog is generated from conventional commits. On push to `main`, the **Changelog** workflow updates `CHANGELOG.md` and commits it.
+Release notes are changesets. A pull request adds a `.changeset/*.md` file with
+`bun run changeset`: a bump type and one or two sentences for the person who
+runs or calls the proxy. The `Changeset present` check fails a pull request
+that adds no file. Use `bun run changeset -- --empty` for a change with nothing
+to tell a user. See `.changeset/README.md` for the headings.
+
+The production deploy (merge to `main`) cuts the release. It reads the highest
+bump type in the pending notes, applies it to the latest `X.Y.Z` tag, writes
+the notes into `CHANGELOG.md` under that version, deletes the files, tags the
+commit and creates the GitHub release. A merge with only empty notes deploys
+but cuts no release. The git tags are the source of truth for the version.
+
+Preview the notes that are waiting with `make changelog` or
+`bun run release:notes pending`.
+
+Commit messages follow conventional commits:
 
 ```bash
 uv tool install pre-commit
