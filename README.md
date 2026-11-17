@@ -41,8 +41,8 @@ For pure logic changes the tests are the faster loop:
 Release notes are changesets. A pull request adds a `.changeset/*.md` file with
 `bun run changeset`: a bump type and one or two sentences for the person who
 runs or calls the proxy. The `Changeset present` check fails a pull request
-that adds no file. Use `bun run changeset -- --empty` for a change with nothing
-to tell a user. See `.changeset/README.md` for the headings.
+that adds no file, or a note with text and no bump, or a bump and no text. Use
+`bun run changeset -- --empty` for a change with nothing to tell a user. See `.changeset/README.md` for the headings.
 
 The production deploy (merge to `main`) cuts the release. It reads the highest
 bump type in the pending notes, applies it to the latest `X.Y.Z` tag, writes

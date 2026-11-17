@@ -78,9 +78,20 @@ describe('next-version', () => {
     expect(run(dir, 'next-version', '--current', '0.3.0')).toBe('');
   });
 
-  test('ignores a bump whose summary is blank', () => {
-    const dir = repo({ one: fixed, blank: blankMajor });
-    expect(run(dir, 'next-version', '--current', '0.3.0')).toBe('0.3.1\n');
+  test('rejects a bump with no text', () => {
+    const result = spawn(repo({ one: fixed, blank: blankMajor }), 'next-version', '--current', '0.3.0');
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.trim()).toBe(
+      '.changeset/blank.md has a bump but no text; write the note or use bun run changeset -- --empty',
+    );
+  });
+
+  test('rejects text with no package and bump', () => {
+    const result = spawn(repo({ loose: '---\n---\n\nA note nobody will render.\n' }), 'pending');
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.trim()).toBe(
+      '.changeset/loose.md has text but no package and bump; run bun run changeset',
+    );
   });
 });
 

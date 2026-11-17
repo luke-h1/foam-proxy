@@ -48,6 +48,31 @@ function requiredFlag(args: string[], name: string): string {
   return value;
 }
 
+function hasBump(changeset: Changeset): boolean {
+  return changeset.releases.some(release => release.type !== 'none');
+}
+
+function checkChangesets(changesets: Changeset[]): Changeset[] {
+  for (const changeset of changesets) {
+    const hasText = changeset.summary.trim().length > 0;
+    if (hasText && !hasBump(changeset)) {
+      throw new Error(
+        `${CHANGESET_DIR}/${changeset.id}.md has text but no package and bump; run bun run changeset`,
+      );
+    }
+    if (!hasText && hasBump(changeset)) {
+      throw new Error(
+        `${CHANGESET_DIR}/${changeset.id}.md has a bump but no text; write the note or use bun run changeset -- --empty`,
+      );
+    }
+  }
+  return changesets;
+}
+
+async function readValidChangesets(): Promise<Changeset[]> {
+  return checkChangesets(await readChangesets(process.cwd()));
+}
+
 function collectNotes(changesets: Changeset[]): Notes {
   const notes: Notes = new Map();
   for (const changeset of changesets) {
@@ -162,14 +187,14 @@ function appendToSection(
 }
 
 async function pending(args: string[]): Promise<void> {
-  const notes = collectNotes(await readChangesets(process.cwd()));
+  const notes = collectNotes(await readValidChangesets());
   const rendered = renderNotes(notes, levelFlag(args));
   console.log(rendered || 'No release notes are waiting since the last release.');
 }
 
 async function nextVersion(args: string[]): Promise<void> {
   const current = requiredFlag(args, '--current');
-  const bump = highestBump(await readChangesets(process.cwd()));
+  const bump = highestBump(await readValidChangesets());
   if (!bump) {
     return;
   }
@@ -180,7 +205,7 @@ async function release(args: string[]): Promise<void> {
   const version = requiredFlag(args, '--version');
   const date = flag(args, '--date') ?? today();
   const changelogPath = flag(args, '--changelog') ?? DEFAULT_CHANGELOG;
-  const changesets = await readChangesets(process.cwd());
+  const changesets = await readValidChangesets();
   const body = renderNotes(collectNotes(changesets), 3);
 
   const changelog = readFileSync(changelogPath, 'utf8');
