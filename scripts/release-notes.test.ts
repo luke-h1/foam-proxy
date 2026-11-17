@@ -82,7 +82,7 @@ describe('next-version', () => {
     const result = spawn(repo({ one: fixed, blank: blankMajor }), 'next-version', '--current', '0.3.0');
     expect(result.exitCode).toBe(1);
     expect(result.stderr.trim()).toBe(
-      '.changeset/blank.md has a bump but no text; write the note or use bun run changeset -- --empty',
+      '.changeset/blank.md has a bump but no text; write the note in the file or delete it and run bun run changeset -- --empty',
     );
   });
 
@@ -90,7 +90,7 @@ describe('next-version', () => {
     const result = spawn(repo({ loose: '---\n---\n\nA note nobody will render.\n' }), 'pending');
     expect(result.exitCode).toBe(1);
     expect(result.stderr.trim()).toBe(
-      '.changeset/loose.md has text but no package and bump; run bun run changeset',
+      '.changeset/loose.md has text but no package and bump; add them to the file or delete it and run bun run changeset',
     );
   });
 });
