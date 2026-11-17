@@ -8,7 +8,7 @@ AUTH      := $(BUILD)/authorizer
 KEEPALIVE := $(BUILD)/magic-keepalive
 NOTIFIER  := $(BUILD)/alarm-notifier
 
-.PHONY: all clean build proxy authorizer keepalive notifier zips changelog version run-local invoke-local test lint fmt vet
+.PHONY: all clean build proxy authorizer keepalive notifier zips changelog run-local invoke-local test lint fmt vet
 
 test:
 	go test -race -shuffle=on -count=1 ./...
@@ -103,7 +103,4 @@ clean:
 	rm -rf $(BUILD)
 
 changelog:
-	git-cliff -o CHANGELOG.md
-
-version:
-	@git-cliff --bumped-version 2>/dev/null || echo "0.1.0"
+	bun scripts/release-notes.ts pending
