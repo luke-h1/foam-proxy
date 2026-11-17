@@ -112,16 +112,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          LATEST="$(git tag -l | sed 's/^v*//' | { grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1)"
-          if [ -z "$LATEST" ] || gh release view "$LATEST" >/dev/null 2>&1; then
+          LATEST_LINE="$(git tag -l | { grep -E '^v*[0-9]+\.[0-9]+\.[0-9]+$' || true; } | awk '{ v=$0; sub(/^v*/, "", v); print v "\t" $0 }' | sort -V | tail -1)"
+          if [ -z "$LATEST_LINE" ]; then
             exit 0
           fi
-          if ! bun scripts/release-notes.ts show --version "$LATEST" > "$RUNNER_TEMP/latest-notes.md"; then
-            echo "CHANGELOG.md has no section for ${LATEST}; nothing to publish"
+          LATEST_VERSION="$(printf '%s' "$LATEST_LINE" | cut -f1)"
+          LATEST_TAG="${LATEST_LINE#*	}"
+          if git tag -l "$LATEST_VERSION" | grep -qx "$LATEST_VERSION"; then
+            LATEST_TAG="$LATEST_VERSION"
+          fi
+          if gh release view "$LATEST_TAG" >/dev/null 2>&1; then
             exit 0
           fi
-          echo "Publishing the release for ${LATEST} that an earlier run tagged but did not create"
-          gh release create "$LATEST" --title "$LATEST" --notes-file "$RUNNER_TEMP/latest-notes.md"
+          if ! bun scripts/release-notes.ts show --version "$LATEST_VERSION" > "$RUNNER_TEMP/latest-notes.md"; then
+            echo "CHANGELOG.md has no section for ${LATEST_VERSION}; nothing to publish"
+            exit 0
+          fi
+          echo "Publishing the release for ${LATEST_TAG} that an earlier run tagged but did not create"
+          gh release create "$LATEST_TAG" --title "$LATEST_VERSION" --notes-file "$RUNNER_TEMP/latest-notes.md"
 
       - name: Resolve the next version
         id: version
