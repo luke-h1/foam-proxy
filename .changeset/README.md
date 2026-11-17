@@ -15,8 +15,10 @@ bump type sets the heading the note lands under and the next version:
 | `minor` | New              | `X.Y+1.0`             |
 | `patch` | Fixed            | `X.Y.Z+1`             |
 
-A change with nothing to tell a user (a refactor, a test, CI) still has to pass
-the `Changeset present` check. Add an empty note:
+A note must have a package, a bump and text together, or be empty: the
+`Changeset present` check fails a note with text and no bump, or a bump and no
+text. A change with nothing to tell a user (a refactor, a test, CI) still has
+to pass the check. Add an empty note:
 
 ```sh
 bun run changeset -- --empty
