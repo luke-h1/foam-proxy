@@ -8,7 +8,13 @@ runs:
       shell: bash
 
     - name: Tune Linux network
-      run: sudo ethtool -K eth0 tx off rx off
+      run: |
+        IFACE="$(ip -o route show default | awk '{ print $5; exit }')"
+        if [ -z "$IFACE" ]; then
+          echo "No default interface; skipping the offload tuning"
+          exit 0
+        fi
+        sudo ethtool -K "$IFACE" tx off rx off
       shell: bash
 
     - name: Set up Go
